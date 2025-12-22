@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GHR Impact Manager</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .scroller::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scroller::-webkit-scrollbar-track { background: #f1f5f9; }
+        .scroller::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .sort-icon { display: inline-block; width: 12px; height: 12px; margin-left: 4px; opacity: 0.5; }
+        .sort-active { opacity: 1; color: #2563eb; }
+        
+        .tooltip { visibility: hidden; width: 220px; background-color: #1e293b; color: #fff; text-align: center; border-radius: 6px; padding: 8px; position: absolute; z-index: 50; bottom: 125%; left: 50%; margin-left: -110px; opacity: 0; transition: opacity 0.3s; font-size: 0.75rem; font-weight: normal; pointer-events: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .has-tooltip { position: relative; display: inline-block; cursor: help; } 
+        .has-tooltip:hover .tooltip { visibility: visible; opacity: 1; }
+
+        .multi-select-dropdown { display: none; position: absolute; top: 100%; left: 0; z-index: 40; width: 100%; max-height: 300px; overflow-y: auto; background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .multi-select-container { position: relative; }
+        .multi-select-container.open .multi-select-dropdown { display: block; }
+        
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .loading-spinner { width: 60px; height: 60px; border: 4px solid #f3f4f6; border-top: 4px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen p-6">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-white text-lg font-medium">Loading data from database...</p>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-900 flex items-center gap-3">
+                <i data-lucide="activity" class="text-blue-600 w-8 h-8"></i>
+                GHR Impact Manager
+            </h1>
+            <p class="text-slate-500 mt-1">Intelligent Markets and Coverage Team Checklist</p>
+        </div>
+        
+        <!-- Controls -->
+        <div class="flex flex-wrap items-center gap-3">
+            
+            <!-- Filters -->
+            <div class="multi-select-container w-40" id="systemFilterContainer">
+                <button onclick="toggleDropdown('systemFilterContainer')" class="w-full flex items-center justify-between bg-white border border-slate-300 rounded-md px-3 py-2 text-sm font-medium shadow-sm">
+                    <span class="truncate" id="systemFilterLabel">All Systems</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                </button>
+                <div class="multi-select-dropdown p-2" id="systemFilterList"></div>
+            </div>
+
+            <div class="multi-select-container w-48" id="facilityFilterContainer">
+                <button onclick="toggleDropdown('facilityFilterContainer')" class="w-full flex items-center justify-between bg-white border border-slate-300 rounded-md px-3 py-2 text-sm font-medium shadow-sm">
+                    <span class="truncate" id="facilityFilterLabel">All Facilities</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                </button>
+                <div class="multi-select-dropdown p-2" id="facilityFilterList"></div>
+            </div>
+
+            <div class="multi-select-container w-64" id="categoryFilterContainer">
+                <button onclick="toggleDropdown('categoryFilterContainer')" class="w-full flex items-center justify-between bg-white border border-slate-300 rounded-md px-3 py-2 text-sm font-medium shadow-sm">
+                    <span class="truncate" id="categoryFilterLabel">All Categories</span>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+                </button>
+                <div class="multi-select-dropdown p-2" id="categoryFilterList"></div>
+            </div>
+
+            <!-- Refresh Button -->
+            <button onclick="loadDataFromDatabase()" id="refreshBtn" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-sm text-sm font-medium transition-colors">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Refresh Data
+            </button>
+            
+            <!-- Export Changes Button -->
+            <button onclick="exportChanges()" class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md shadow-sm text-sm font-medium transition-colors">
+                <i data-lucide="download" class="w-4 h-4"></i> Export Changes
+            </button>
+            
+            <!-- View History Button -->
+            <button onclick="openHistoryModal()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow-sm text-sm font-medium transition-colors">
+                <i data-lucide="history" class="w-4 h-4"></i> View History
+            </button>
+        </div>
+    </header>
+
+    <!-- KPI CARDS CONTAINER (Visible in List View) -->
+    <div id="kpiContainer" class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        <!-- Populated by JS -->
+    </div>
+
+    <!-- VIEW TOGGLE & LEGEND -->
+    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+        <div id="legendContainer" class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 bg-white p-3 rounded-md border border-slate-200 inline-flex shadow-sm">
+            <!-- Populated by JS -->
+        </div>
+        
+        <div class="flex bg-slate-200 rounded-lg p-1 shadow-sm">
+            <button onclick="setView('list')" id="viewBtnList" class="px-4 py-2 text-sm font-bold rounded-md transition-colors bg-white shadow text-blue-600">List View</button>
+            <button onclick="setView('kanban')" id="viewBtnKanban" class="px-4 py-2 text-sm font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700">Kanban View</button>
+        </div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="listView" class="bg-white rounded-lg shadow-md overflow-hidden scroller" style="max-height: 75vh; overflow-y: auto;">
+        <table class="w-full">
+            <thead id="tableHeader" class="bg-slate-800 text-white sticky top-0 z-10">
+                <!-- Populated by JS -->
+            </thead>
+            <tbody id="tableBody">
+                <!-- Populated by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- KANBAN VIEW -->
+    <div id="kanbanView" style="display:none;">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden flex flex-col" style="max-height:75vh;">
+                <div class="bg-green-600 text-white font-bold p-3 flex items-center gap-2"><i data-lucide="check-circle"></i> Fresh Orders <span id="countGreen" class="ml-auto"></span></div>
+                <div id="kanbanGreen" class="flex-1 overflow-y-auto scroller p-3 space-y-3"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden flex flex-col" style="max-height:75vh;">
+                <div class="bg-yellow-500 text-white font-bold p-3 flex items-center gap-2"><i data-lucide="alert-triangle"></i> Warning <span id="countYellow" class="ml-auto"></span></div>
+                <div id="kanbanYellow" class="flex-1 overflow-y-auto scroller p-3 space-y-3"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden flex flex-col" style="max-height:75vh;">
+                <div class="bg-red-500 text-white font-bold p-3 flex items-center gap-2"><i data-lucide="alert-circle"></i> High Priority <span id="countRed" class="ml-auto"></span></div>
+                <div id="kanbanRed" class="flex-1 overflow-y-auto scroller p-3 space-y-3"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden flex flex-col" style="max-height:75vh;">
+                <div class="bg-red-800 text-white font-bold p-3 flex items-center gap-2"><i data-lucide="x-circle"></i> Critical <span id="countDarkRed" class="ml-auto"></span></div>
+                <div id="kanbanDarkRed" class="flex-1 overflow-y-auto scroller p-3 space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FOR LEVER ACTIONS -->
+    <div id="leverModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display:none;">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-96 fade-in">
+            <h3 class="text-lg font-bold mb-4" id="leverModalTitle"></h3>
+            <div id="leverModalContent"></div>
+            <div class="flex justify-end gap-3 mt-4">
+                <button onclick="closeLeverModal()" class="px-4 py-2 bg-slate-200 rounded hover:bg-slate-300 text-sm font-medium">Cancel</button>
+                <button onclick="saveLeverAction()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FOR DECLINE ANALYSIS -->
+    <div id="declineModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display:none;">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-3/4 max-w-4xl max-h-[80vh] overflow-y-auto fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Decline Analysis</h3>
+                <button onclick="closeDeclineModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x"></i></button>
+            </div>
+            <div id="declineModalContent"></div>
+        </div>
+    </div>
+
+    <!-- MODAL FOR HISTORY -->
+    <div id="historyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display:none;">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-11/12 max-w-6xl max-h-[90vh] overflow-y-auto fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold text-slate-900">Change History</h3>
+                <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            
+            <div class="mb-4 flex gap-3">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium mb-1">View State At:</label>
+                    <select id="historyVersionSelect" onchange="loadHistoricalVersion()" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="">Select a version...</option>
+                    </select>
+                </div>
+                <div class="flex items-end gap-2">
+                    <button onclick="compareVersions()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium">
+                        <i data-lucide="git-compare" class="w-4 h-4 inline mr-1"></i> Compare
+                    </button>
+                    <button onclick="restoreVersion()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-medium">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4 inline mr-1"></i> Restore
+                    </button>
+                </div>
+            </div>
+            
+            <div id="historyContent" class="border rounded-lg p-4 bg-slate-50 min-h-[400px]">
+                <!-- History content loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // CONFIGURATION
+        // ============================================================================
+        
+        // DATABASE CONFIGURATION
+        // Replace these with your actual database connection details
+        const DB_CONFIG = {
+            host: 'your-database-host.com',
+            database: 'your_database_name',
+            // For security, API endpoint should handle authentication
+            apiEndpoint: '/api/get-positions',  // Your backend API endpoint
+            changesEndpoint: '/api/changes',     // Endpoint for loading/saving changes
+            historyEndpoint: '/api/history'      // Endpoint for version history
+        };
+        
+        // Global state for tracking changes
+        let changeLog = [];
+        let historyVersions = [];
+        let currentHistoryVersion = null;
+        
+        // ============================================================================
+        // AGING RULES
+        // ============================================================================
+        
+        const AGING_RULES = {
+            'Travel Nursing': { thresholds: { yellow: 30, red: 60, darkRed: 90 } },
+            'Travel Allied Health': { thresholds: { yellow: 21, red: 42, darkRed: 63 } },
+            'Per Diem (Nursing)': { thresholds: { yellow: 30, red: 60, darkRed: 90 } },
+            'Contract (Allied)': { thresholds: { yellow: 21, red: 42, darkRed: 63 } },
+            'Permanent Placement': { thresholds: { yellow: 30, red: 60, darkRed: 90 } },
+            'default': { thresholds: { yellow: 30, red: 60, darkRed: 90 } }
+        };
+
+        const LEVER_LABELS = {
+            socialMedia: "Social Media",
+            outreach: "Agency Outreach",
+            bonus: "Bonus Increase",
+            rateIncrease: "Rate Increase",
+            avOpen: "Open to AV",
+            hotSheet: "Add to HotSheet"
+        };
+
+        // ============================================================================
+        // GLOBAL STATE
+        // ============================================================================
+        
+        let allJobs = [];
+        let filteredJobs = [];
+        let currentFilters = { system: [], facility: [], category: [] };
+        let currentView = 'list';
+        let sortConfig = { key: null, direction: 'asc' };
+        let expandedRows = new Set();
+        let candidateViews = {};
+
+        // ============================================================================
+        // DATA LOADING FROM DATABASE
+        // ============================================================================
+        
+        async function loadDataFromDatabase() {
+            try {
+                document.getElementById('loadingOverlay').style.display = 'flex';
+                
+                // Load base data from database
+                const baseData = await fetchDataFromDatabase();
+                
+                // Load changes from server
+                await loadChangesFromServer();
+                
+                // Apply changes on top of base data
+                allJobs = applyChangesToData(baseData);
+                
+                // Process and render
+                filteredJobs = [...allJobs];
+                renderAll();
+                
+                document.getElementById('loadingOverlay').style.display = 'none';
+                console.log('Data loaded successfully:', allJobs.length, 'jobs');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Error loading data from database. Please check console for details.');
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        }
+
+        async function fetchDataFromDatabase() {
+            // OPTION 1: Using a backend API (RECOMMENDED)
+            // This is the secure way - your backend handles database connections
+            try {
+                const response = await fetch(DB_CONFIG.apiEndpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                return processRawData(data);
+            } catch (error) {
+                console.error('Error fetching from API:', error);
+                
+                // FALLBACK: Mock data for testing
+                console.warn('Using mock data - please implement proper database connection');
+                return getMockData();
+            }
+            
+            // OPTION 2: Direct SQL connection (requires backend proxy)
+            // You cannot connect directly to SQL databases from browser JavaScript
+            // You MUST create a backend API endpoint that:
+            // 1. Connects to your SQL database
+            // 2. Executes the query: SELECT * FROM open_positions
+            // 3. Returns the results as JSON
+        }
+
+        function processRawData(rawData) {
+            // Convert raw database records to the app's data format
+            return rawData.map((row, idx) => {
+                const dateAdded = new Date(row.date_added || row['Date Added']);
+                const daysPast = calculateDateDiff(dateAdded);
+                const system = row.program || row['Program'];
+                
+                return {
+                    id: row.position_id || row['Position ID'] || `job-${idx}`,
+                    positionId: row.position_id || row['Position ID'],
+                    facility: row.facility_name || row['Facility Name'],
+                    specialty: row.specialty_name || row['Specialty Name'],
+                    system: system,
+                    dateAdded: dateAdded,
+                    daysPast: daysPast,
+                    costCenter: row.cost_center || row['Cost Center'],
+                    unit: row.unit_name || row['Unit Name'],
+                    startDate: row.start_date || row['Start Date'],
+                    shiftHours: row.shift_hours || row['Shift Hours'],
+                    shiftTime: row.shift_time || row['Shift Time'],
+                    billRate: row.bill_rate || row['Bill Rate'],
+                    shiftDiff: row.shift_diff || row['Shift Diff Eve/Nite/Rot'],
+                    minHours: row.min_hours || row['Min Hours'],
+                    submissions: row.submissions || row['# of Submissions'] || 0,
+                    positions: row.number_of_positions || row['Number of Positions'] || 1,
+                    reqReason: row.requisition_reason || row['Requisition Reason'],
+                    hiringManager: row.hiring_manager || row['Hiring Manager'],
+                    status: row.status || "No updates available",
+                    levers: {
+                        socialMedia: { done: false, date: null, user: '' },
+                        outreach: { done: false, date: null, user: '' },
+                        bonus: { done: false, date: null, user: '' },
+                        rateIncrease: { done: false, date: null, user: '' },
+                        avOpen: { done: false, date: null, user: '' },
+                        hotSheet: { done: false, date: null, user: '' }
+                    },
+                    candidates: [],
+                    category: calculateCategory(daysPast, system)
+                };
+            });
+        }
+
+        function getMockData() {
+            // Mock data for testing when database is not available
+            return [
+                {
+                    id: 'mock-1',
+                    positionId: 'TEST-001',
+                    facility: 'Test Hospital',
+                    specialty: 'RN - ICU',
+                    system: 'Travel Nursing',
+                    dateAdded: new Date('2024-11-01'),
+                    daysPast: 51,
+                    costCenter: 'CC-123',
+                    unit: 'ICU',
+                    startDate: '2025-01-15',
+                    shiftHours: '12',
+                    shiftTime: 'Days',
+                    billRate: '$75.00',
+                    shiftDiff: '$5.00',
+                    minHours: '36',
+                    submissions: 5,
+                    positions: 2,
+                    reqReason: 'Staffing Shortage',
+                    hiringManager: 'John Doe',
+                    status: 'Actively recruiting',
+                    levers: {
+                        socialMedia: { done: true, date: '2024-11-15', user: 'Admin' },
+                        outreach: { done: false, date: null, user: '' },
+                        bonus: { done: false, date: null, user: '' },
+                        rateIncrease: { done: false, date: null, user: '' },
+                        avOpen: { done: false, date: null, user: '' },
+                        hotSheet: { done: false, date: null, user: '' }
+                    },
+                    candidates: [
+                        { name: 'Jane Smith', agency: 'GHR Healthcare', status: 'Interviewing', date: '2024-12-01', active: true },
+                        { name: 'Bob Johnson', agency: 'Planet Healthcare', status: 'Submitted', date: '2024-12-10', active: true }
+                    ],
+                    category: 'red'
+                }
+            ];
+        }
+
+        // ============================================================================
+        // CHANGE TRACKING SYSTEM
+        // ============================================================================
+        
+        async function loadChangesFromServer() {
+            try {
+                const response = await fetch(DB_CONFIG.changesEndpoint);
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        // No changes file exists yet, start fresh
+                        console.log('No existing changes found, starting fresh');
+                        changeLog = [];
+                        return;
+                    }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                changeLog = data.changes || [];
+                console.log('Loaded', changeLog.length, 'changes from server');
+            } catch (error) {
+                console.error('Error loading changes from server:', error);
+                changeLog = [];
+            }
+        }
+
+        async function saveChangesToServer() {
+            try {
+                const timestamp = new Date().toISOString();
+                const changeData = {
+                    metadata: {
+                        version: '1.0',
+                        lastUpdated: timestamp,
+                        totalChanges: changeLog.length
+                    },
+                    changes: changeLog
+                };
+                
+                // Save current state
+                const response = await fetch(DB_CONFIG.changesEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(changeData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // Create version history snapshot
+                await createHistorySnapshot(timestamp, changeData);
+                
+                console.log('Saved', changeLog.length, 'changes to server');
+                return true;
+            } catch (error) {
+                console.error('Error saving changes to server:', error);
+                alert('Warning: Could not save changes to server. Changes may be lost.');
+                return false;
+            }
+        }
+
+        async function createHistorySnapshot(timestamp, changeData) {
+            try {
+                const snapshot = {
+                    timestamp: timestamp,
+                    changeCount: changeLog.length,
+                    data: changeData
+                };
+                
+                await fetch(DB_CONFIG.historyEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(snapshot)
+                });
+                
+                console.log('Created history snapshot:', timestamp);
+            } catch (error) {
+                console.error('Error creating history snapshot:', error);
+                // Don't fail the main save if history fails
+            }
+        }
+
+        async function recordChange(jobId, changeType, changeData) {
+            const change = {
+                id: `change-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                timestamp: new Date().toISOString(),
+                jobId: jobId,
+                type: changeType,
+                data: changeData,
+                user: 'Current User' // You can implement user tracking
+            };
+            
+            changeLog.push(change);
+            await saveChangesToServer();
+            console.log('Recorded change:', change);
+        }
+
+        function applyChangesToData(baseData) {
+            // Create a deep copy of base data
+            let data = JSON.parse(JSON.stringify(baseData));
+            
+            // Apply each change in chronological order
+            changeLog.forEach(change => {
+                const job = data.find(j => j.id === change.jobId);
+                if (!job) return;
+                
+                switch (change.type) {
+                    case 'lever_update':
+                        if (job.levers[change.data.leverKey]) {
+                            // Explicitly set all properties to ensure clean state
+                            job.levers[change.data.leverKey] = {
+                                done: change.data.done === true, // Ensure boolean
+                                date: change.data.done ? change.data.date : null,
+                                user: change.data.done ? change.data.user : '',
+                                notes: change.data.done ? (change.data.notes || '') : ''
+                            };
+                        }
+                        break;
+                    
+                    case 'candidate_add':
+                        if (!job.candidates) job.candidates = [];
+                        job.candidates.push(change.data.candidate);
+                        break;
+                    
+                    case 'candidate_update':
+                        if (job.candidates) {
+                            const candIdx = job.candidates.findIndex(c => c.name === change.data.candidateName);
+                            if (candIdx !== -1) {
+                                job.candidates[candIdx] = { ...job.candidates[candIdx], ...change.data.updates };
+                            }
+                        }
+                        break;
+                    
+                    case 'status_update':
+                        job.status = change.data.newStatus;
+                        break;
+                }
+            });
+            
+            return data;
+        }
+
+        async function exportChanges() {
+            try {
+                // Download the current change log from server
+                const response = await fetch(DB_CONFIG.changesEndpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const dataStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `ghr-impact-changes-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                alert(`Exported ${changeLog.length} changes`);
+            } catch (error) {
+                console.error('Error exporting changes:', error);
+                alert('Error exporting changes. See console for details.');
+            }
+        }
+
+        async function clearChanges() {
+            if (confirm('Are you sure you want to clear all tracked changes? This cannot be undone and will affect all users.')) {
+                try {
+                    changeLog = [];
+                    await saveChangesToServer();
+                    await loadDataFromDatabase(); // Reload to show base data
+                    alert('All changes cleared.');
+                } catch (error) {
+                    console.error('Error clearing changes:', error);
+                    alert('Error clearing changes. See console for details.');
+                }
+            }
+        }
+
+        // ============================================================================
+        // UTILITY FUNCTIONS
+        // ============================================================================
+        
+        function calculateDateDiff(date) {
+            const d = new Date(date);
+            const now = new Date();
+            const diff = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+            return diff;
+        }
+
+        function calculateCategory(days, system) {
+            const rules = AGING_RULES[system] || AGING_RULES.default;
+            if (days >= rules.thresholds.darkRed) return 'darkRed';
+            if (days >= rules.thresholds.red) return 'red';
+            if (days >= rules.thresholds.yellow) return 'yellow';
+            return 'green';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        // ============================================================================
+        // FILTER FUNCTIONS
+        // ============================================================================
+        
+        function toggleDropdown(containerId) {
+            const container = document.getElementById(containerId);
+            container.classList.toggle('open');
+            document.querySelectorAll('.multi-select-container').forEach(c => {
+                if (c.id !== containerId) c.classList.remove('open');
+            });
+        }
+
+        function applyFilters() {
+            filteredJobs = allJobs.filter(job => {
+                const systemMatch = currentFilters.system.length === 0 || currentFilters.system.includes(job.system);
+                const facilityMatch = currentFilters.facility.length === 0 || currentFilters.facility.includes(job.facility);
+                const categoryMatch = currentFilters.category.length === 0 || currentFilters.category.includes(job.category);
+                return systemMatch && facilityMatch && categoryMatch;
+            });
+            renderAll();
+        }
+
+        function updateFilterList(type, values) {
+            const containerId = `${type}FilterContainer`;
+            const listId = `${type}FilterList`;
+            const labelId = `${type}FilterLabel`;
+            
+            const list = document.getElementById(listId);
+            list.innerHTML = `
+                <label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                    <input type="checkbox" onchange="selectAllFilters('${type}', this.checked)" ${currentFilters[type].length === 0 ? 'checked' : ''}>
+                    <span class="text-sm font-medium">All</span>
+                </label>
+                ${values.map(v => `
+                    <label class="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                        <input type="checkbox" value="${v}" onchange="toggleFilter('${type}', '${v}')" ${currentFilters[type].includes(v) ? 'checked' : ''}>
+                        <span class="text-sm">${v}</span>
+                    </label>
+                `).join('')}
+            `;
+            
+            updateFilterLabel(type);
+        }
+
+        function toggleFilter(type, value) {
+            const idx = currentFilters[type].indexOf(value);
+            if (idx > -1) {
+                currentFilters[type].splice(idx, 1);
+            } else {
+                currentFilters[type].push(value);
+            }
+            updateFilterLabel(type);
+            applyFilters();
+        }
+
+        function selectAllFilters(type, checked) {
+            if (checked) {
+                currentFilters[type] = [];
+            }
+            updateFilterList(type, [...new Set(allJobs.map(j => j[type]))]);
+            applyFilters();
+        }
+
+        function updateFilterLabel(type) {
+            const labelId = `${type}FilterLabel`;
+            const label = document.getElementById(labelId);
+            if (currentFilters[type].length === 0) {
+                label.textContent = `All ${type.charAt(0).toUpperCase() + type.slice(1)}s`;
+            } else if (currentFilters[type].length === 1) {
+                label.textContent = currentFilters[type][0];
+            } else {
+                label.textContent = `${currentFilters[type].length} selected`;
+            }
+        }
+
+        // ============================================================================
+        // RENDER FUNCTIONS
+        // ============================================================================
+        
+        function renderAll() {
+            renderKPIs();
+            renderLegend();
+            if (currentView === 'list') {
+                renderListView();
+            } else {
+                renderKanbanView();
+            }
+            lucide.createIcons();
+        }
+
+        function renderKPIs() {
+            const totalJobs = filteredJobs.length;
+            const totalPositions = filteredJobs.reduce((sum, j) => sum + (parseInt(j.positions) || 1), 0);
+            const totalSubmissions = filteredJobs.reduce((sum, j) => sum + (parseInt(j.submissions) || 0), 0);
+            const avgDays = totalJobs ? Math.round(filteredJobs.reduce((sum, j) => sum + j.daysPast, 0) / totalJobs) : 0;
+            const completionRate = totalJobs ? Math.round((filteredJobs.filter(j => Object.values(j.levers).filter(l => l.done).length >= 4).length / totalJobs) * 100) : 0;
+
+            document.getElementById('kpiContainer').innerHTML = `
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500">
+                    <div class="text-sm text-slate-500 font-medium">Total Jobs</div>
+                    <div class="text-2xl font-bold text-slate-900">${totalJobs}</div>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-purple-500">
+                    <div class="text-sm text-slate-500 font-medium">Total Positions</div>
+                    <div class="text-2xl font-bold text-slate-900">${totalPositions}</div>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-green-500">
+                    <div class="text-sm text-slate-500 font-medium">Total Submissions</div>
+                    <div class="text-2xl font-bold text-slate-900">${totalSubmissions}</div>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-500">
+                    <div class="text-sm text-slate-500 font-medium">Avg Days Open</div>
+                    <div class="text-2xl font-bold text-slate-900">${avgDays}</div>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow-sm border-l-4 border-indigo-500">
+                    <div class="text-sm text-slate-500 font-medium">Action Completion</div>
+                    <div class="text-2xl font-bold text-slate-900">${completionRate}%</div>
+                </div>
+            `;
+        }
+
+        function renderLegend() {
+            const counts = {
+                green: filteredJobs.filter(j => j.category === 'green').length,
+                yellow: filteredJobs.filter(j => j.category === 'yellow').length,
+                red: filteredJobs.filter(j => j.category === 'red').length,
+                darkRed: filteredJobs.filter(j => j.category === 'darkRed').length
+            };
+
+            document.getElementById('legendContainer').innerHTML = `
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-[#22C55E]"></div><span>Fresh (${counts.green})</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-[#FACC15]"></div><span>Warning (${counts.yellow})</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-[#EF4444]"></div><span>High (${counts.red})</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-red-800"></div><span>Critical (${counts.darkRed})</span></div>
+            `;
+        }
+
+        function setView(view) {
+            currentView = view;
+            document.getElementById('viewBtnList').className = `px-4 py-2 text-sm font-bold rounded-md transition-colors ${view === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`;
+            document.getElementById('viewBtnKanban').className = `px-4 py-2 text-sm font-bold rounded-md transition-colors ${view === 'kanban' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`;
+            
+            if (view === 'list') {
+                document.getElementById('listView').style.display = 'block';
+                document.getElementById('kanbanView').style.display = 'none';
+                document.getElementById('kpiContainer').style.display = 'grid';
+                renderListView();
+            } else {
+                document.getElementById('listView').style.display = 'none';
+                document.getElementById('kanbanView').style.display = 'block';
+                document.getElementById('kpiContainer').style.display = 'none';
+                renderKanbanView();
+            }
+        }
+
+        function renderListView() {
+            const header = document.getElementById('tableHeader');
+            header.innerHTML = `
+                <tr>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('category')">Status</th>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('positionId')">Position ID</th>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('facility')">Facility</th>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('specialty')">Specialty</th>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('system')">System</th>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('daysPast')">Days Open</th>
+                    <th class="p-3 text-left">Progress</th>
+                    <th class="p-3 text-left cursor-pointer hover:bg-slate-700" onclick="sortTable('submissions')">Submissions</th>
+                    <th class="p-3 text-center"></th>
+                </tr>
+            `;
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = filteredJobs.map(job => renderJobRow(job)).join('');
+        }
+
+        function renderJobRow(job) {
+            const expanded = expandedRows.has(job.id);
+            const currentView = candidateViews[job.id] || 'active';
+            
+            const categoryColors = {
+                green: 'bg-[#22C55E]',
+                yellow: 'bg-[#FACC15]',
+                red: 'bg-[#EF4444]',
+                darkRed: 'bg-red-800'
+            };
+
+            const leversDone = Object.values(job.levers).filter(l => l.done).length;
+            const leversTotal = Object.keys(job.levers).length;
+            const progressPct = Math.round((leversDone / leversTotal) * 100);
+
+            const activeCandidates = (job.candidates || []).filter(c => c.active !== false);
+            const declinedCandidates = (job.candidates || []).filter(c => c.active === false);
+
+            let row = `
+                <tr class="border-b hover:bg-slate-50 cursor-pointer" onclick="toggleRow('${job.id}')">
+                    <td class="p-3"><div class="w-3 h-3 rounded ${categoryColors[job.category]}"></div></td>
+                    <td class="p-3 font-medium">${job.positionId}</td>
+                    <td class="p-3">${job.facility}</td>
+                    <td class="p-3">${job.specialty}</td>
+                    <td class="p-3 text-sm">${job.system}</td>
+                    <td class="p-3 font-bold">${job.daysPast}</td>
+                    <td class="p-3">
+                        <div class="flex items-center gap-2">
+                            <div class="flex-1 bg-slate-200 rounded-full h-2">
+                                <div class="bg-indigo-600 h-2 rounded-full" style="width: ${progressPct}%"></div>
+                            </div>
+                            <span class="text-xs font-medium">${leversDone}/${leversTotal}</span>
+                        </div>
+                    </td>
+                    <td class="p-3 text-center font-bold">${job.submissions || 0}</td>
+                    <td class="p-3 text-center"><i data-lucide="${expanded ? 'chevron-up' : 'chevron-down'}"></i></td>
+                </tr>`;
+
+            if(expanded) {
+                let recText = "";
+                let recColor = "bg-slate-100 text-slate-700 border-slate-200"; 
+                
+                if (job.daysPast >= (AGING_RULES[job.system] || AGING_RULES.default).thresholds.darkRed) {
+                    recColor = "bg-red-800 text-white border-red-900";
+                    recText = "Order is Aged (Critical). Immediate Action Required: Submit ANY candidate regardless of agency.";
+                } else if (job.daysPast >= (AGING_RULES[job.system] || AGING_RULES.default).thresholds.red) {
+                    recColor = "bg-[#EF4444] text-white border-red-600";
+                    recText = "Order is Aged (High). Action: Jobs should be open to Associate Vendors (AVs).";
+                } else if (job.daysPast >= (AGING_RULES[job.system] || AGING_RULES.default).thresholds.yellow) {
+                    recColor = "bg-[#FACC15] text-white border-yellow-600";
+                    recText = "Order is Aged (Warning). Consider opening to AVs and assign date jobs will be opened.";
+                } else {
+                    recColor = "bg-[#22C55E] text-white border-green-600";
+                    recText = "Order is Fresh. Prioritize GHR submissions flow - keep AV jobs closed.";
+                }
+
+                row += `<tr><td colspan="9" class="bg-slate-50 p-6 border-b">
+                    <div class="grid grid-cols-2 gap-8 mb-6">
+                        <div>
+                            <h4 class="font-bold mb-2">Impact Checklist</h4>
+                            <div class="grid grid-cols-2 gap-2">
+                                ${Object.keys(job.levers).map(k => {
+                                    const lever = job.levers[k];
+                                    const isDone = lever && lever.done === true;
+                                    const userName = isDone && lever.user ? lever.user : '';
+                                    return `
+                                    <div class="border p-2 rounded flex items-center gap-2 ${isDone ? 'border-indigo-500 bg-indigo-50' : 'bg-white border-slate-200'}">
+                                        <input type="checkbox" ${isDone ? 'checked' : ''} onclick="event.stopPropagation(); openLeverModal('${job.id}', '${k}', ${isDone})">
+                                        <span class="text-xs">${LEVER_LABELS[k]}</span>
+                                        ${isDone && userName ? `<span class="ml-auto text-[10px] text-slate-400">${userName}</span>` : ''}
+                                    </div>
+                                `}).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-slate-700 flex items-center gap-2"><i data-lucide="briefcase" class="w-5 h-5 text-indigo-600"></i> Candidate Log</h3>
+                                <div class="flex bg-slate-100 rounded-lg p-1">
+                                    <button onclick="event.stopPropagation(); toggleCandidateView('${job.id}', 'active')" class="px-3 py-1 text-xs font-bold rounded-md transition-colors ${currentView === 'active' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}">Active (${activeCandidates.length})</button>
+                                    <button onclick="event.stopPropagation(); toggleCandidateView('${job.id}', 'declined')" class="px-3 py-1 text-xs font-bold rounded-md transition-colors ${currentView === 'declined' ? 'bg-white shadow text-red-600' : 'text-slate-500 hover:text-slate-700'}">Declined (${declinedCandidates.length})</button>
+                                </div>
+                            </div>
+                            <div class="bg-white border rounded h-64 overflow-y-auto p-2">
+                                ${currentView === 'active' ? 
+                                    (activeCandidates.length ? activeCandidates.map(c => {
+                                        const days = calculateDateDiff(c.date);
+                                        const isGHR = c.agency.toLowerCase().includes('ghr');
+                                        const isPlanet = c.agency.toLowerCase().includes('planet');
+                                        const agencyClass = isGHR ? 'text-blue-700 bg-blue-50 font-bold' : (isPlanet ? 'text-purple-700 bg-purple-50 font-bold' : 'text-slate-600 bg-slate-50');
+                                        
+                                        let warning = '';
+                                        if(days >= 15) warning = `<div class="text-[10px] text-red-600 mt-1 font-bold">⚠️ 15+ Days: Identify if candidate is still available/active</div>`;
+                                        else if(days >= 8) warning = `<div class="text-[10px] text-orange-600 mt-1 font-bold">⚠️ 8-14 Days: Advise manager - risk of losing candidate</div>`;
+                                        else if(days >= 7) warning = `<div class="text-[10px] text-yellow-600 mt-1 font-bold">⚠️ 7 Days: Provide update on interview/offer</div>`;
+
+                                        return `
+                                        <div class="flex justify-between text-xs p-2 border-b ${agencyClass} rounded mb-1">
+                                            <div>
+                                                <span class="block text-sm font-bold">${c.name}</span>
+                                                <span class="text-[10px] opacity-75">${c.agency}</span>
+                                                ${warning}
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="block font-medium">${c.status}</span>
+                                                <span class="text-[10px] opacity-75">Subbed ${days} days ago</span>
+                                            </div>
+                                        </div>`
+                                    }).join('') : '<div class="text-center py-4 text-slate-400 text-xs">No active candidates</div>')
+                                    : 
+                                    (declinedCandidates.length ? declinedCandidates.map(c => `
+                                        <div class="flex justify-between text-xs p-2 border-b bg-red-50 text-red-600">
+                                            <div><span class="font-bold line-through">${c.name}</span> (${c.agency})</div>
+                                            <div class="text-[10px] italic">${c.declineReason || 'Declined'}</div>
+                                        </div>`).join('') : '<div class="text-center py-4 text-slate-400 text-xs">No declined candidates</div>')
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-slate-100 p-4 rounded-lg border border-slate-200 shadow-inner">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><i data-lucide="file-text" class="w-3 h-3"></i> Current Status / Notes</h4>
+                                <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border">Hiring Mgr: ${job.hiringManager}</span>
+                            </div>
+                            <p class="text-sm text-slate-700 leading-relaxed">${job.status}</p>
+                        </div>
+                        
+                        <div class="${recColor} p-4 rounded-lg border shadow-inner">
+                            <div class="flex items-start gap-3">
+                                <div class="bg-white/20 p-2 rounded-full"><i data-lucide="zap" class="w-5 h-5 text-current"></i></div>
+                                <div>
+                                    <h4 class="text-xs font-bold uppercase tracking-wider mb-1">IMPACT Recommendation</h4>
+                                    <p class="text-sm font-medium leading-snug">${recText}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td></tr>`;
+            }
+            return row;
+        }
+
+        function renderKanbanView() {
+            ['green', 'yellow', 'red', 'darkRed'].forEach(cat => {
+                const jobs = filteredJobs.filter(j => j.category === cat);
+                const container = document.getElementById(`kanban${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
+                const countEl = document.getElementById(`count${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
+                
+                countEl.textContent = jobs.length;
+                container.innerHTML = jobs.map(job => renderKanbanCard(job)).join('');
+            });
+        }
+
+        function renderKanbanCard(job) {
+            const leversDone = Object.values(job.levers).filter(l => l.done).length;
+            const leversTotal = Object.keys(job.levers).length;
+            
+            return `
+                <div class="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer" onclick="toggleRow('${job.id}'); setView('list');">
+                    <div class="font-bold text-sm mb-1">${job.positionId}</div>
+                    <div class="text-xs text-slate-600 mb-2">${job.specialty}</div>
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-500">${job.daysPast} days</span>
+                        <span class="font-medium text-indigo-600">${leversDone}/${leversTotal} done</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleRow(jobId) {
+            if (expandedRows.has(jobId)) {
+                expandedRows.delete(jobId);
+            } else {
+                expandedRows.add(jobId);
+            }
+            renderListView();
+            lucide.createIcons();
+        }
+
+        function toggleCandidateView(jobId, view) {
+            candidateViews[jobId] = view;
+            renderListView();
+            lucide.createIcons();
+        }
+
+        function sortTable(key) {
+            if (sortConfig.key === key) {
+                sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortConfig.key = key;
+                sortConfig.direction = 'asc';
+            }
+
+            filteredJobs.sort((a, b) => {
+                let aVal = a[key];
+                let bVal = b[key];
+                
+                if (typeof aVal === 'string') {
+                    aVal = aVal.toLowerCase();
+                    bVal = bVal.toLowerCase();
+                }
+                
+                if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            renderListView();
+            lucide.createIcons();
+        }
+
+        // ============================================================================
+        // LEVER MODAL
+        // ============================================================================
+        
+        let currentLeverJob = null;
+        let currentLeverKey = null;
+
+        function openLeverModal(jobId, leverKey, isDone) {
+            currentLeverJob = jobId;
+            currentLeverKey = leverKey;
+            
+            const job = allJobs.find(j => j.id === jobId);
+            const lever = job.levers[leverKey];
+            
+            document.getElementById('leverModalTitle').textContent = `${isDone ? 'Undo' : 'Mark Complete'}: ${LEVER_LABELS[leverKey]}`;
+            document.getElementById('leverModalContent').innerHTML = isDone ? 
+                `<p class="text-sm text-slate-600">Are you sure you want to undo this action?</p>
+                 <p class="text-xs text-slate-400 mt-2">Completed by ${lever.user} on ${lever.date}</p>` :
+                `<div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Your Name</label>
+                        <input type="text" id="leverUserInput" class="w-full border rounded px-3 py-2 text-sm" placeholder="Enter your name">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Notes (optional)</label>
+                        <textarea id="leverNotesInput" class="w-full border rounded px-3 py-2 text-sm" rows="3" placeholder="Add any notes..."></textarea>
+                    </div>
+                </div>`;
+            
+            document.getElementById('leverModal').style.display = 'flex';
+        }
+
+        function closeLeverModal() {
+            document.getElementById('leverModal').style.display = 'none';
+            currentLeverJob = null;
+            currentLeverKey = null;
+        }
+
+        async function saveLeverAction() {
+            const job = allJobs.find(j => j.id === currentLeverJob);
+            const lever = job.levers[currentLeverKey];
+            
+            console.log('Before save - Lever state:', currentLeverKey, JSON.stringify(lever));
+            
+            if (lever.done) {
+                // Undo action - completely reset the lever state
+                await recordChange(currentLeverJob, 'lever_update', {
+                    leverKey: currentLeverKey,
+                    done: false,
+                    date: null,
+                    user: '',
+                    notes: ''
+                });
+                
+                // Explicitly clear all properties
+                lever.done = false;
+                lever.date = null;
+                lever.user = '';
+                lever.notes = '';
+                
+                console.log('After undo - Lever state:', currentLeverKey, JSON.stringify(lever));
+            } else {
+                // Mark complete
+                const userName = document.getElementById('leverUserInput').value.trim();
+                const notes = document.getElementById('leverNotesInput').value.trim();
+                
+                if (!userName) {
+                    alert('Please enter your name');
+                    return;
+                }
+                
+                const now = new Date().toISOString().split('T')[0];
+                await recordChange(currentLeverJob, 'lever_update', {
+                    leverKey: currentLeverKey,
+                    done: true,
+                    date: now,
+                    user: userName,
+                    notes: notes
+                });
+                
+                lever.done = true;
+                lever.date = now;
+                lever.user = userName;
+                lever.notes = notes;
+                
+                console.log('After complete - Lever state:', currentLeverKey, JSON.stringify(lever));
+            }
+            
+            closeLeverModal();
+            
+            // Force complete re-render of the entire view
+            filteredJobs = [...allJobs];
+            if (currentView === 'list') {
+                renderListView();
+            } else {
+                renderKanbanView();
+            }
+            renderKPIs();
+            lucide.createIcons();
+        }
+
+        // ============================================================================
+        // HISTORY MODAL FUNCTIONS
+        // ============================================================================
+        
+        async function openHistoryModal() {
+            try {
+                document.getElementById('historyModal').style.display = 'flex';
+                
+                // Load history versions
+                const response = await fetch(DB_CONFIG.historyEndpoint);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                historyVersions = await response.json();
+                
+                // Populate dropdown
+                const select = document.getElementById('historyVersionSelect');
+                select.innerHTML = '<option value="">Current State</option>' + 
+                    historyVersions.map((v, idx) => {
+                        const date = new Date(v.timestamp);
+                        const dateStr = date.toLocaleString();
+                        return `<option value="${idx}">${dateStr} (${v.changeCount} changes)</option>`;
+                    }).join('');
+                
+                // Show current state by default
+                document.getElementById('historyContent').innerHTML = `
+                    <div class="text-center py-8 text-slate-500">
+                        <i data-lucide="clock" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                        <p class="text-lg font-medium">Select a version to view historical data</p>
+                        <p class="text-sm mt-2">${historyVersions.length} versions available</p>
+                    </div>
+                `;
+                
+                lucide.createIcons();
+            } catch (error) {
+                console.error('Error loading history:', error);
+                alert('Error loading history. See console for details.');
+            }
+        }
+
+        function closeHistoryModal() {
+            document.getElementById('historyModal').style.display = 'none';
+            currentHistoryVersion = null;
+        }
+
+        async function loadHistoricalVersion() {
+            const select = document.getElementById('historyVersionSelect');
+            const versionIdx = select.value;
+            
+            if (versionIdx === '') {
+                // Show current state
+                document.getElementById('historyContent').innerHTML = `
+                    <div class="text-center py-8 text-slate-500">
+                        <p class="text-lg font-medium">Current State</p>
+                        <p class="text-sm mt-2">${changeLog.length} total changes</p>
+                    </div>
+                `;
+                currentHistoryVersion = null;
+                return;
+            }
+            
+            currentHistoryVersion = historyVersions[versionIdx];
+            const historicalData = currentHistoryVersion.data;
+            
+            // Display the historical changes
+            const content = document.getElementById('historyContent');
+            content.innerHTML = `
+                <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                    <div class="flex items-center gap-2 text-blue-800 font-bold mb-1">
+                        <i data-lucide="info" class="w-4 h-4"></i>
+                        Viewing Historical Version
+                    </div>
+                    <div class="text-sm text-blue-700">
+                        <strong>Timestamp:</strong> ${new Date(currentHistoryVersion.timestamp).toLocaleString()}<br>
+                        <strong>Total Changes:</strong> ${currentHistoryVersion.changeCount}
+                    </div>
+                </div>
+                
+                <div class="space-y-2 max-h-[500px] overflow-y-auto">
+                    ${historicalData.changes.length > 0 ? historicalData.changes.map(change => `
+                        <div class="border rounded p-3 bg-white hover:shadow-md transition-shadow">
+                            <div class="flex justify-between items-start mb-2">
+                                <div>
+                                    <span class="font-bold text-sm text-slate-900">${change.jobId}</span>
+                                    <span class="ml-2 text-xs px-2 py-1 rounded ${
+                                        change.type === 'lever_update' ? 'bg-indigo-100 text-indigo-700' :
+                                        change.type === 'candidate_add' ? 'bg-green-100 text-green-700' :
+                                        change.type === 'candidate_update' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-slate-100 text-slate-700'
+                                    }">${change.type.replace('_', ' ')}</span>
+                                </div>
+                                <span class="text-xs text-slate-500">${new Date(change.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div class="text-sm text-slate-600">
+                                ${formatChangeData(change)}
+                            </div>
+                            <div class="text-xs text-slate-400 mt-1">By: ${change.user}</div>
+                        </div>
+                    `).join('') : '<div class="text-center py-8 text-slate-400">No changes in this version</div>'}
+                </div>
+            `;
+            
+            lucide.createIcons();
+        }
+
+        function formatChangeData(change) {
+            switch (change.type) {
+                case 'lever_update':
+                    return `<strong>${LEVER_LABELS[change.data.leverKey] || change.data.leverKey}</strong> - ${change.data.done ? 'Completed' : 'Undone'}${change.data.notes ? `<br><em>"${change.data.notes}"</em>` : ''}`;
+                case 'candidate_add':
+                    return `Added candidate: <strong>${change.data.candidate.name}</strong> from ${change.data.candidate.agency}`;
+                case 'candidate_update':
+                    return `Updated candidate: <strong>${change.data.candidateName}</strong> - ${JSON.stringify(change.data.updates)}`;
+                case 'status_update':
+                    return `Status updated: <em>"${change.data.newStatus}"</em>`;
+                default:
+                    return JSON.stringify(change.data);
+            }
+        }
+
+        async function compareVersions() {
+            const select = document.getElementById('historyVersionSelect');
+            const versionIdx = select.value;
+            
+            if (versionIdx === '') {
+                alert('Please select a version to compare with current state');
+                return;
+            }
+            
+            const historicalVersion = historyVersions[versionIdx];
+            const historicalChanges = historicalVersion.data.changes;
+            const currentChanges = changeLog;
+            
+            // Find differences
+            const added = currentChanges.filter(c => !historicalChanges.find(h => h.id === c.id));
+            const removed = historicalChanges.filter(h => !currentChanges.find(c => c.id === h.id));
+            
+            const content = document.getElementById('historyContent');
+            content.innerHTML = `
+                <div class="mb-4 p-4 bg-purple-50 border-l-4 border-purple-500 rounded">
+                    <div class="flex items-center gap-2 text-purple-800 font-bold mb-1">
+                        <i data-lucide="git-compare" class="w-4 h-4"></i>
+                        Comparing Versions
+                    </div>
+                    <div class="text-sm text-purple-700">
+                        <strong>Historical:</strong> ${new Date(historicalVersion.timestamp).toLocaleString()} (${historicalChanges.length} changes)<br>
+                        <strong>Current:</strong> ${new Date().toLocaleString()} (${currentChanges.length} changes)
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="font-bold text-green-700 mb-2 flex items-center gap-2">
+                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                            Added (${added.length})
+                        </h4>
+                        <div class="space-y-2 max-h-[450px] overflow-y-auto">
+                            ${added.length > 0 ? added.map(change => `
+                                <div class="border border-green-300 bg-green-50 rounded p-2 text-sm">
+                                    <div class="font-bold">${change.jobId}</div>
+                                    <div class="text-xs text-green-700">${formatChangeData(change)}</div>
+                                </div>
+                            `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No changes added</div>'}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-bold text-red-700 mb-2 flex items-center gap-2">
+                            <i data-lucide="minus-circle" class="w-4 h-4"></i>
+                            Removed (${removed.length})
+                        </h4>
+                        <div class="space-y-2 max-h-[450px] overflow-y-auto">
+                            ${removed.length > 0 ? removed.map(change => `
+                                <div class="border border-red-300 bg-red-50 rounded p-2 text-sm">
+                                    <div class="font-bold">${change.jobId}</div>
+                                    <div class="text-xs text-red-700">${formatChangeData(change)}</div>
+                                </div>
+                            `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No changes removed</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            lucide.createIcons();
+        }
+
+        async function restoreVersion() {
+            if (!currentHistoryVersion) {
+                alert('Please select a version to restore');
+                return;
+            }
+            
+            const confirmMsg = `Are you sure you want to restore to the version from ${new Date(currentHistoryVersion.timestamp).toLocaleString()}?\n\nThis will replace the current state with ${currentHistoryVersion.changeCount} changes and create a new snapshot.`;
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            try {
+                // Restore the historical changes
+                changeLog = [...currentHistoryVersion.data.changes];
+                
+                // Save as current (this will also create a new history snapshot)
+                await saveChangesToServer();
+                
+                // Reload data to reflect restored state
+                await loadDataFromDatabase();
+                
+                alert('Version restored successfully!');
+                closeHistoryModal();
+            } catch (error) {
+                console.error('Error restoring version:', error);
+                alert('Error restoring version. See console for details.');
+            }
+        }
+
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
+        
+        function init() {
+            // Load data from database
+            loadDataFromDatabase();
+            
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.multi-select-container')) {
+                    document.querySelectorAll('.multi-select-container').forEach(c => c.classList.remove('open'));
+                }
+            });
+            
+            // Populate filter dropdowns
+            setTimeout(() => {
+                const systems = [...new Set(allJobs.map(j => j.system))];
+                const facilities = [...new Set(allJobs.map(j => j.facility))];
+                const categories = ['green', 'yellow', 'red', 'darkRed'];
+                
+                updateFilterList('system', systems);
+                updateFilterList('facility', facilities);
+                updateFilterList('category', categories);
+            }, 500);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
