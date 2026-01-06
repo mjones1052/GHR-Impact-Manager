@@ -3027,14 +3027,20 @@
             }
             
             // Sort by timestamp descending (most recent first)
-            historyVersions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            // Handle both 'timestamp' and 'snapshot_timestamp' field names from API
+            historyVersions.sort((a, b) => {
+                const dateA = new Date(a.timestamp || a.snapshot_timestamp);
+                const dateB = new Date(b.timestamp || b.snapshot_timestamp);
+                return dateB - dateA;
+            });
             
             // Populate dropdown
             const select = document.getElementById('historyVersionSelect');
             select.innerHTML = '<option value="">Current State</option>' + 
                 historyVersions.map((v, idx) => {
-                    const dateStr = Utils.formatTimestamp(v.timestamp);
-                    return `<option value="${idx}">${dateStr} (${v.changeCount} changes)</option>`;
+                    const dateStr = Utils.formatTimestamp(v.timestamp || v.snapshot_timestamp);
+                    const changeCount = v.changeCount || v.change_count || 0;
+                    return `<option value="${idx}">${dateStr} (${changeCount} changes)</option>`;
                 }).join('');
             
             // Show current state by default
@@ -3086,8 +3092,8 @@
                     Viewing Historical Version
                 </div>
                 <div class="text-sm text-blue-700">
-                    <strong>Timestamp:</strong> ${Utils.formatTimestamp(currentHistoryVersion.timestamp)}<br>
-                    <strong>Total Changes:</strong> ${currentHistoryVersion.changeCount}
+                    <strong>Timestamp:</strong> ${Utils.formatTimestamp(currentHistoryVersion.timestamp || currentHistoryVersion.snapshot_timestamp)}<br>
+                    <strong>Total Changes:</strong> ${currentHistoryVersion.changeCount || currentHistoryVersion.change_count || 0}
                 </div>
             </div>
             
@@ -3172,10 +3178,6 @@
                 </div>
             </div>
             
-            <div class="mb-4 p-3 bg-slate-100 rounded text-xs text-slate-600">
-                <strong>Note:</strong> "Added" shows new changes since the selected version. "Removed" shows changes that existed in the historical version but are no longer in the current log (typically only happens after a restore operation). Undoing a lever creates a new "Undo" change rather than removing the original.
-            </div>
-            
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <h4 class="font-bold text-green-700 mb-2 flex items-center gap-2">
@@ -3225,7 +3227,7 @@
             return;
         }
         
-        const confirmMsg = `Are you sure you want to restore to the version from ${Utils.formatTimestamp(currentHistoryVersion.timestamp)}?\n\nThis will replace the current state with ${currentHistoryVersion.changeCount} changes.`;
+        const confirmMsg = `Are you sure you want to restore to the version from ${Utils.formatTimestamp(currentHistoryVersion.timestamp || currentHistoryVersion.snapshot_timestamp)}?\n\nThis will replace the current state with ${currentHistoryVersion.changeCount || currentHistoryVersion.change_count || 0} changes.`;
         
         if (!confirm(confirmMsg)) {
             return;
