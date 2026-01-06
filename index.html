@@ -1656,7 +1656,12 @@
         $('listViewWrapper')?.classList.toggle('hidden', view !== 'list');
         $('hotJobsViewWrapper')?.classList.toggle('hidden', view !== 'hotjobs');
         $('statsViewWrapper')?.classList.toggle('hidden', view !== 'stats');
-        $('kpiContainer')?.classList.toggle('hidden', view !== 'list');
+        
+        // Use visibility to hide KPI and legend on other tabs (preserves layout)
+        const kpiEl = $('kpiContainer');
+        const legendEl = $('legendContainer');
+        if (kpiEl) kpiEl.style.visibility = view === 'list' ? 'visible' : 'hidden';
+        if (legendEl) legendEl.style.visibility = view === 'stats' ? 'hidden' : 'visible';
 
         const btnList = $('btnViewList');
         const btnHot = $('btnViewHot');
@@ -2492,11 +2497,6 @@
               s.view = payload;
               View.viewToggle();
               View.main();
-              // Hide legend on stats tab, show on other tabs (use visibility to preserve layout)
-              const legendEl = $('legendContainer');
-              if (legendEl) {
-                legendEl.style.visibility = payload === 'stats' ? 'hidden' : 'visible';
-              }
               break;
             }
 
