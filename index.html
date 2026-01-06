@@ -40,7 +40,7 @@
   </style>
 </head>
 
-<body class="bg-slate-50 text-slate-800 h-screen w-full p-6 flex flex-col overflow-hidden">
+<body class="bg-slate-50 text-slate-800 min-h-screen w-full p-6 flex flex-col overflow-x-hidden overflow-y-auto md:h-screen md:overflow-hidden">
 
   <!-- TOAST CONTAINER -->
   <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col gap-2"></div>
@@ -227,8 +227,8 @@
     </div>
   </div>
 
-  <div id="mainContent" class="flex-1 relative overflow-hidden flex flex-col min-h-0">
-    <div id="listViewWrapper" class="bg-white shadow-lg rounded-lg border border-slate-200 flex flex-col h-full overflow-hidden min-h-0">
+  <div id="mainContent" class="flex-1 relative overflow-visible md:overflow-hidden flex flex-col min-h-0">
+    <div id="listViewWrapper" class="bg-white shadow-lg rounded-lg border border-slate-200 flex flex-col md:h-full overflow-visible md:overflow-hidden min-h-0">
       <div class="grid grid-cols-12 bg-slate-100 p-4 font-bold text-slate-600 border-b border-slate-200 text-sm uppercase tracking-wider sticky top-0 z-20 shrink-0" id="tableHeader">
         <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','id')">ID <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
         <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','program')">Category <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
@@ -241,7 +241,7 @@
         <div class="col-span-2 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','ghrDeclines')">Declines <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
       </div>
 
-      <div id="jobsContainer" class="divide-y divide-slate-100 flex-1 overflow-y-auto scroller min-h-0 relative">
+      <div id="jobsContainer" class="divide-y divide-slate-100 flex-1 overflow-visible md:overflow-y-auto scroller min-h-0 relative">
         <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
           <i data-lucide="loader" class="w-12 h-12 mb-2 opacity-50 animate-spin"></i>
           <p>Loading data...</p>
@@ -1905,13 +1905,27 @@
                     jobs.forEach(job => {
                         const isNew = job.daysPast <= 3;
                         
-                        // Icon Logic - based on Time_Type (job.shift)
-                        const timeType = String(job.shift || '').toLowerCase();
+                        // Icon Logic - based on Start_Time AM/PM or military time
+                        const startTime = String(job.startTime || '').toUpperCase();
                         let icon = '<i data-lucide="clock" class="w-3 h-3 text-slate-400"></i>'; // Default
-                        if (timeType.includes('night')) {
-                            icon = '<i data-lucide="moon" class="w-3 h-3 text-indigo-500 fill-indigo-100"></i>';
-                        } else if (timeType.includes('day')) {
+                        
+                        if (startTime.includes('A')) {
+                            // AM indicator
                             icon = '<i data-lucide="sun" class="w-3 h-3 text-orange-500 fill-orange-100"></i>';
+                        } else if (startTime.includes('P')) {
+                            // PM indicator
+                            icon = '<i data-lucide="moon" class="w-3 h-3 text-indigo-500 fill-indigo-100"></i>';
+                        } else {
+                            // Try military time - extract hour
+                            const hourMatch = startTime.match(/^(\d{1,2})/);
+                            if (hourMatch) {
+                                const hour = parseInt(hourMatch[1], 10);
+                                if (hour >= 5 && hour < 12) {
+                                    icon = '<i data-lucide="sun" class="w-3 h-3 text-orange-500 fill-orange-100"></i>';
+                                } else if (hour >= 12 && hour < 24) {
+                                    icon = '<i data-lucide="moon" class="w-3 h-3 text-indigo-500 fill-indigo-100"></i>';
+                                }
+                            }
                         }
 
                         // Metrics Calculations
