@@ -1,0 +1,3097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GHR Impact Manager</title>
+
+  <!-- Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 0.2s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
+    .scroller::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scroller::-webkit-scrollbar-track { background: #f1f5f9; }
+    .scroller::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    .multi-select-dropdown {
+      display: none; position: absolute; top: 100%; left: 0; z-index: 50;
+      min-width: 100%; width: max-content; max-height: 400px; overflow-y: auto;
+      background: white; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    .multi-select-container.open .multi-select-dropdown { display: block; }
+
+    #loadingOverlay { backdrop-filter: blur(2px); }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    #toastContainer { pointer-events: none; }
+    .toast { pointer-events: auto; transition: all 0.3s ease; }
+
+    .hot-job-active { color: #ef4444; fill: #fee2e2; }
+  </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 h-screen w-full p-6 flex flex-col overflow-hidden">
+
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col gap-2"></div>
+
+  <!-- LOADING OVERLAY -->
+  <div id="loadingOverlay" class="hidden fixed inset-0 bg-white/50 z-[100] flex flex-col items-center justify-center">
+    <div class="bg-white p-4 rounded-lg shadow-xl border flex items-center gap-3">
+      <div class="spinner"></div>
+      <span class="font-bold text-slate-700" id="loadingText">Processing...</span>
+    </div>
+  </div>
+
+  <!-- EXPLANATION MODAL -->
+  <div id="helpModal" class="hidden fixed inset-0 bg-black/50 z-[90] flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-lg shadow-2xl w-[600px] border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+        <h3 class="font-bold text-slate-700 flex items-center gap-2">
+          <i data-lucide="database" class="w-5 h-5 text-green-600"></i> Database Workflow Guide
+        </h3>
+        <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto">
+        <div class="space-y-6">
+          <div class="flex gap-4">
+            <div class="bg-green-100 text-green-700 w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0">1</div>
+            <div>
+              <h4 class="font-bold text-slate-800">Load from Database</h4>
+              <p class="text-sm text-slate-600 mt-1">Click the green <span class="font-bold text-green-600">Load from Database</span> button to fetch the latest position data from your SQL Server database. This loads fresh data every time.</p>
+            </div>
+          </div>
+
+          <div class="flex gap-4">
+            <div class="bg-blue-100 text-blue-700 w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0">2</div>
+            <div>
+              <h4 class="font-bold text-slate-800">Make Changes</h4>
+              <p class="text-sm text-slate-600 mt-1">Toggle levers, update margins, add notes - all changes are <strong>automatically saved</strong> to the database in real-time. No need to manually save!</p>
+            </div>
+          </div>
+
+          <div class="flex gap-4">
+            <div class="bg-purple-100 text-purple-700 w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0">3</div>
+            <div>
+              <h4 class="font-bold text-slate-800">Refresh Anytime</h4>
+              <p class="text-sm text-slate-600 mt-1">Click the <span class="font-bold text-blue-600">Refresh</span> button to reload data and see changes made by other team members.</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded border border-slate-200 text-sm">
+            <strong class="text-slate-700">Pro Tip:</strong> Start each day by clicking "Load from Database" to get the freshest data. All your changes sync automatically across the team!
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t border-slate-200 text-right bg-slate-50">
+        <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 text-sm font-medium">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="mb-6 flex flex-col xl:flex-row xl:items-center justify-between gap-4 shrink-0">
+    <div>
+      <h1 class="text-3xl font-bold text-slate-900 flex items-center gap-3">
+        <i data-lucide="activity" class="text-blue-600 w-8 h-8"></i>
+        GHR Impact Manager
+      </h1>
+      <p class="text-slate-500 mt-1">High-Performance Optimization Build</p>
+    </div>
+
+    <div class="flex flex-wrap items-end gap-3" id="controlsArea">
+      <div class="multi-select-container relative w-40" id="systemFilterContainer"></div>
+      <div class="multi-select-container relative w-40" id="facilityFilterContainer"></div>
+      <div class="multi-select-container relative w-40" id="categoryFilterContainer"></div>
+      <div class="multi-select-container relative w-40" id="specialtyFilterContainer"></div>
+
+      <div class="relative w-32">
+        <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Search ID</label>
+        <div class="relative">
+          <input type="text" placeholder="Job ID..." 
+                 class="w-full bg-white border border-slate-300 rounded-md pl-7 pr-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                 oninput="store.dispatch('SET_SEARCH', this.value)">
+          <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-2.5 top-3"></i>
+        </div>
+      </div>
+
+      <div class="relative w-32">
+        <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Days Age Range</label>
+        <div class="flex gap-1">
+          <input type="number" id="minAge" placeholder="Min"
+                 class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                 oninput="store.dispatch('SET_AGE_RANGE')">
+          <input type="number" id="maxAge" placeholder="Max"
+                 class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                 oninput="store.dispatch('SET_AGE_RANGE')">
+        </div>
+      </div>
+
+      <div class="flex gap-2 pb-0.5 items-center">
+        <!-- Database Action Buttons (grouped) -->
+        <div class="flex items-center bg-white border border-slate-300 rounded-md shadow-sm h-[38px]">
+          <button onclick="loadDataFromDatabase()" 
+                  class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 h-full rounded-l-md text-sm font-medium transition-colors border-r border-green-700" 
+                  title="Load live data from database">
+            <i data-lucide="database" class="w-4 h-4"></i> Load
+          </button>
+          <button onclick="loadDataFromDatabase()" 
+                  class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 h-full text-sm font-medium transition-colors border-r border-blue-700"
+                  title="Refresh data from database">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+          <button onclick="document.getElementById('helpModal').classList.remove('hidden')" 
+                  class="px-2 h-full hover:bg-slate-100 text-slate-500 rounded-r-md transition-colors" 
+                  title="Database workflow help">
+            <i data-lucide="help-circle" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <button id="saveBtn"
+                class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                onclick="exportData()" title="Download updated file">
+          <i data-lucide="save" class="w-4 h-4"></i> Save
+        </button>
+        
+        <!-- NEW AI BUTTONS -->
+        <button class="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                onclick="store.dispatch('GENERATE_HOT_JOBS_EMAIL')" title="AI Hot Job Summary">
+            <i data-lucide="flame" class="w-4 h-4"></i>
+        </button>
+        <button class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                onclick="store.dispatch('GENERATE_SUMMARY')" title="AI Impact Call Summary">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+        </button>
+
+        <button id="privacyBtn"
+                class="flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                onclick="store.dispatch('TOGGLE_PRIVACY')" title="Redact Vendor Info">
+          <i data-lucide="eye" id="privacyIcon" class="w-4 h-4"></i>
+        </button>
+        
+        <!-- View History Button -->
+        <button onclick="openHistoryModal()" 
+                class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                title="View change history">
+          <i data-lucide="history" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- HISTORY MODAL -->
+  <div id="historyModal" class="hidden fixed inset-0 bg-black/50 z-[90] flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-lg shadow-2xl w-11/12 max-w-6xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+        <h3 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="history" class="w-6 h-6 text-purple-600"></i> Change History
+        </h3>
+        <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto">
+        <div class="mb-4 flex gap-3">
+          <div class="flex-1">
+            <label class="block text-sm font-medium mb-1">View State At:</label>
+            <select id="historyVersionSelect" onchange="loadHistoricalVersion()" class="w-full border rounded px-3 py-2 text-sm">
+              <option value="">Select a version...</option>
+            </select>
+          </div>
+          <div class="flex items-end gap-2">
+            <button onclick="compareVersions()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
+              <i data-lucide="git-compare" class="w-4 h-4"></i> Compare
+            </button>
+            <button onclick="restoreVersion()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Restore
+            </button>
+          </div>
+        </div>
+        
+        <div id="historyContent" class="border rounded-lg p-4 bg-slate-50 min-h-[400px]">
+          <!-- History content loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="kpiContainer" class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6 shrink-0 min-h-[100px]"></div>
+
+  <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 shrink-0">
+    <div id="legendContainer" class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 bg-white p-3 rounded-md border border-slate-200 inline-flex shadow-sm min-h-[38px]"></div>
+    <div class="flex items-center gap-3">
+      <div class="flex bg-white border border-slate-200 rounded-lg p-1 shadow-sm" id="viewToggles">
+        <button onclick="store.dispatch('SET_VIEW','list')" id="btnViewList"
+                class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors bg-blue-50 text-blue-700 shadow-sm border border-blue-100">List View</button>
+        <button onclick="store.dispatch('SET_VIEW','hotjobs')" id="btnViewHot"
+                class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700 flex items-center gap-1">
+          <i data-lucide="flame" class="w-3 h-3 text-orange-500"></i> Hot Jobs
+        </button>
+        <button onclick="store.dispatch('SET_VIEW','stats')" id="btnViewStats"
+                class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700">Stats</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainContent" class="flex-1 relative overflow-hidden flex flex-col min-h-0">
+    <div id="listViewWrapper" class="bg-white shadow-lg rounded-lg border border-slate-200 flex flex-col h-full overflow-hidden min-h-0">
+      <div class="grid grid-cols-12 bg-slate-100 p-4 font-bold text-slate-600 border-b border-slate-200 text-sm uppercase tracking-wider sticky top-0 z-20 shrink-0" id="tableHeader">
+        <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','id')">ID <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','program')">Category <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-3 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','facility')">System / Facility / Specialty <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','billRate')">Bill Rate <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','daysPast')">Days <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','margin')">Margin <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','impact')">Impact <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','ghrSubs')">Active <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','ghrDeclines')">Declines <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+        <div class="col-span-1 text-center">Action</div>
+      </div>
+
+      <div id="jobsContainer" class="divide-y divide-slate-100 flex-1 overflow-y-auto scroller min-h-0 relative">
+        <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+          <i data-lucide="inbox" class="w-12 h-12 mb-2 opacity-50"></i>
+          <p>No data loaded. Click "Load from Database" to begin.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="hotJobsViewWrapper" class="hidden flex flex-col h-full overflow-hidden bg-slate-50">
+      <div class="flex justify-between items-center p-4">
+        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2"><i data-lucide="flame" class="text-orange-500"></i> Hot Jobs List</h2>
+        <!-- Old Button Removed here, handled in Header -->
+      </div>
+      <div id="hotJobsContainer" class="flex-1 overflow-y-auto scroller p-6"></div>
+    </div>
+
+    <div id="statsViewWrapper" class="hidden flex flex-col h-full overflow-hidden bg-white shadow-lg rounded-lg border border-slate-200">
+      <div class="flex-1 overflow-y-auto scroller p-6">
+        <div id="statsContent" class="space-y-6"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION MODAL -->
+  <div id="actionModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div class="bg-white p-6 rounded-lg shadow-2xl w-[500px] border border-slate-200 max-h-[90vh] flex flex-col">
+      <h3 class="text-lg font-bold mb-4 text-slate-800 shrink-0" id="modalTitle">Confirm Action</h3>
+
+      <div class="overflow-y-auto flex-1 pr-2">
+        <div id="modalContent">
+          <div id="standardInputContainer" class="hidden">
+            <div id="marginInputContainer" class="hidden mb-4">
+              <label class="block text-xs font-bold text-slate-500 mb-1">New Margin %</label>
+              <input type="number" id="modalMarginValue" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+
+          <div id="nextStepContainer" class="hidden mb-4">
+            <label class="block text-xs font-bold text-slate-500 mb-1">Action / Next Step</label>
+            <textarea id="nextStepText" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-blue-500 h-24 mb-2" placeholder="Describe the next step..."></textarea>
+          </div>
+
+          <div id="leverInputContainer" class="hidden mb-4">
+            <label class="block text-xs font-bold text-slate-500 mb-1">Assign To / Tag (Required)</label>
+            <input type="text" id="leverTagInput" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-blue-500 bg-slate-50" placeholder="Select a team member below..." readonly />
+          </div>
+
+          <div id="commonTagContainer" class="hidden mb-4">
+            <span class="text-[10px] uppercase font-bold text-slate-400">Quick Tag Team:</span>
+            <div class="flex flex-wrap gap-1 mt-1" id="tagContainer"></div>
+          </div>
+
+          <div id="dateInputContainer" class="hidden mb-4">
+            <label class="block text-xs font-bold text-slate-500 mb-1" id="dateInputLabel">Date</label>
+            <input type="date" id="modalDateInput" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+
+          <div id="removeReasonContainer" class="hidden mb-4">
+            <label class="block text-xs font-bold text-slate-500 mb-1">Reason for Removal</label>
+            <select id="removeReasonInput" class="w-full border border-slate-300 rounded p-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
+              <option value="">Select a reason...</option>
+              <option value="Candidate Withdrew">Candidate Withdrew</option>
+              <option value="Not Qualified">Not Qualified</option>
+              <option value="Offer Declined">Offer Declined</option>
+              <option value="Position Filled">Position Filled</option>
+              <option value="Unresponsive">Unresponsive</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div id="candidateActionContainer" class="hidden mb-4 space-y-3">
+            <p class="text-sm text-slate-600 mb-2">Select an action for <span id="candidateNameDisplay" class="font-bold"></span>:</p>
+
+            <button class="w-full text-left p-3 border rounded hover:bg-yellow-50 hover:border-yellow-300 transition-colors flex items-center justify-between group"
+              onclick="document.getElementById('candidateActionType').value='confirm_interview'; document.getElementById('candidateActionContainer').classList.add('hidden'); document.getElementById('leverInputContainer').classList.remove('hidden'); document.getElementById('commonTagContainer').classList.remove('hidden'); document.getElementById('dateInputContainer').classList.remove('hidden'); document.getElementById('dateInputLabel').innerText='Interview Date'; document.getElementById('modalDateInput').valueAsDate = new Date(); View.renderTags('lever');">
+              <span class="font-medium text-slate-700">Confirm Interview Scheduled</span>
+              <i data-lucide="check-circle" class="w-4 h-4 text-slate-300 group-hover:text-yellow-600"></i>
+            </button>
+
+            <button class="w-full text-left p-3 border rounded hover:bg-red-50 hover:border-red-300 transition-colors flex items-center justify-between group"
+              onclick="document.getElementById('candidateActionType').value='remove_candidate'; document.getElementById('candidateActionContainer').classList.add('hidden'); document.getElementById('leverInputContainer').classList.remove('hidden'); document.getElementById('commonTagContainer').classList.remove('hidden'); document.getElementById('removeReasonContainer').classList.remove('hidden'); View.renderTags('lever');">
+              <span class="font-medium text-slate-700">Remove Candidate from Queue</span>
+              <i data-lucide="trash-2" class="w-4 h-4 text-slate-300 group-hover:text-red-600"></i>
+            </button>
+
+            <input type="hidden" id="candidateActionType" />
+          </div>
+
+          <div id="summaryContainer" class="hidden">
+            <textarea id="summaryText" class="w-full border border-slate-300 rounded p-2 text-xs font-mono bg-slate-50 h-64 mb-2 focus:outline-none"></textarea>
+            <button onclick="window.copySummary(this)" class="text-xs text-blue-600 hover:underline">Copy to Clipboard</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-4 shrink-0">
+        <button id="modalCancelBtn" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded text-sm">Cancel</button>
+        <button id="modalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // Stability upgrades applied (the stuff causing your errors)
+    // 1) More forgiving header matching (fixes Position ID vs Job ID)
+    // 2) Clear error messages that show what headers it actually saw
+    // 3) Guardrails so failed imports do not cascade into null errors
+    // 4) Small helper functions reduce copy paste and make reordering safe
+    // 5) Centralized parsing so weird Excel types do not break the app
+    // ============================================================
+
+    const $ = (id) => document.getElementById(id);
+
+    // ============================================================================
+    // NOTE: Database Integration
+    // ============================================================================
+    // When levers are toggled, changes are automatically saved to the database
+    // via the recordChange() function. The app loads data from the database
+    // using the "Load from Database" button.
+    //
+    // To fully integrate:
+    // 1. Deploy Azure Functions (see AZURE_COMPLETE_HOSTING.md)
+    // 2. Update API_BASE_URL to your Azure Function App URL
+    // 3. Use "Load from Database" button to load live data
+    // 4. All lever changes automatically sync to database
+    // ============================================================================
+
+    // ============================================================================
+    // DATABASE & API CONFIGURATION FOR AZURE
+    // ============================================================================
+    
+    // API Configuration - Update this to your Azure Function App URL
+    // For Azure Static Web Apps: use '/api' (it auto-routes to Azure Functions)
+    // For separate Function App: use 'https://your-function-app.azurewebsites.net/api'
+    const API_BASE_URL = '/api';
+    
+    const DB_CONFIG = {
+        apiEndpoint: `${API_BASE_URL}/get-positions`,
+        changesEndpoint: `${API_BASE_URL}/changes`,
+        historyEndpoint: `${API_BASE_URL}/history`
+    };
+    
+    // Global change log and history
+    let changeLog = [];
+    let historyVersions = [];
+
+
+
+    // ==========================
+    // 0. TOAST NOTIFICATION SYSTEM
+    // ==========================
+    window.showToast = (msg, type = 'error') => {
+      const container = $('toastContainer');
+      if (!container) return;
+      const el = document.createElement('div');
+      const bg = type === 'success' ? 'bg-emerald-600' : (type === 'error' ? 'bg-red-600' : 'bg-blue-600');
+      const icon = type === 'success' ? 'check-circle' : (type === 'error' ? 'alert-circle' : 'info');
+
+      el.className = `toast ${bg} text-white px-4 py-3 rounded shadow-lg text-sm font-medium fade-in flex items-center gap-3 min-w-[300px] transform translate-x-full opacity-0`;
+      el.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5 shrink-0"></i><span>${msg}</span>`;
+      container.appendChild(el);
+      lucide.createIcons();
+
+      requestAnimationFrame(() => el.classList.remove('translate-x-full', 'opacity-0'));
+      setTimeout(() => {
+        el.classList.add('opacity-0', 'translate-x-4');
+        setTimeout(() => el.remove(), 300);
+      }, 3500);
+    };
+
+    // ==========================
+    // 1. CONFIG & CONSTANTS
+    // ==========================
+    const CONSTANTS = {
+      TEAM_MEMBERS: [
+        { name: "Alyssa Comita", email: "acomita@ghrhealthcare.com" },
+        { name: "Alyssa Depte", email: "adepte@ghrhealthcare.com" },
+        { name: "Amy Comer", email: "acomer@ghresources.com" },
+        { name: "Ashley Rosati", email: "arosati@ghrhealthcare.com" },
+        { name: "Cody Burch", email: "cburch@ghrhealthcare.com" },
+        { name: "Cyndi Domine", email: "cdomine@ghrhealthcare.com" },
+        { name: "Cynthia Westphal", email: "cwestphal@ghrhealthcare.com" },
+        { name: "Daniel Matteson", email: "dmatteson@ghrhealthcare.com" },
+        { name: "David Blatt", email: "dblatt@ghresources.com" },
+        { name: "Ed Willis", email: "ewillis@ghrhealthcare.com" },
+        { name: "Emily Peer", email: "epeer@ghresources.com" },
+        { name: "Jake Gehman", email: "jgehman@ghrhealthcare.com" },
+        { name: "Jen Dierkes", email: "jdirekes@ghresources.com" },
+        { name: "Jennifer O’Neill", email: "jONeill@ghrhealthcare.com" },
+        { name: "Jerry Klasik", email: "jklasik@ghresources.com" },
+        { name: "Karla Farrell", email: "kfarrell@ghrhealthcare.com" },
+        { name: "Liam O'Keefe", email: "lokeefe@ghrhealthcare.com" },
+        { name: "Mallory Harpe", email: "mharpe@ghresources.com" },
+        { name: "Matthew Kyle", email: "mkyle@ghrhealthcare.com" },
+        { name: "Monty Mckentry", email: "mmckentry@ghrhealthcare.com" },
+        { name: "Peter Mecouch", email: "pmecouch@ghrhealthcare.com" },
+        { name: "Rachel Baker", email: "rbaker@ghrhealthcare.com" },
+        { name: "Robin Wine", email: "rwine@ghrhealthcare.com" },
+        { name: "Tania Fornelos", email: "tfornelos@ghrhealthcare.com" },
+        { name: "Tina Davidson", email: "tdavidson@ghrhealthcare.com" }
+      ],
+
+      // Key fix: Reordered subDate to top to prevent "Candidate" key from stealing "Candidate Submission" column
+      COLUMN_MAP: {
+        // Critical Dates First. "Submission Date" priority over "Candidate Submission"
+        subDate: ['Submission Date', 'Candidate Submission', 'Sub Date', 'Date Submitted', 'Submission'],
+        
+        // Identifiers
+        id: ['Req ID', 'Job ID', 'Position ID', 'Order ID', 'Contract Assignment ID', 'External ID', 'Assignment ID', 'Requisition ID', 'PositionID', 'Position Id'],
+        facility: ['Facility', 'Facility Name', 'Client Name', 'Location', 'Client', 'Hospital', 'Building'],
+        agency: ['Agency', 'Vendor', 'Supplier', 'Company', 'Company Name', 'Agency Name', 'Vendor Name'],
+        specialty: ['Specialty', 'Specialty Name', 'Role', 'Job Title', 'Department', 'Cost Center', 'Care Type', 'Profession', 'Category', 'Discipline'],
+        candidate: ['Professional', 'Professional Name', 'Candidate Name', 'Candidate', 'Name', 'Resource Name', 'Employee', 'Employee Name', 'Clinician', 'Clinician Name', 'Worker', 'Traveler', 'Consultant', 'Job Seeker', 'Applicant', 'Review Candidate Name'],
+        system: ['System', 'Network', 'Client System', 'Parent Company', 'Health System'],
+        program: ['Program', 'Unit', 'Category', 'Dept', 'Division', 'Segment', 'Service Line', 'Profession', 'Department'],
+        unit: ['Unit', 'Unit Name', 'Unit Description', 'Department Name', 'Cost Center', 'Cost Center Name'],
+        dateAdded: ['Date Added', 'Created', 'Open Date', 'Created Date', 'Start Date', 'Posted'],
+        billRate: ['Bill Rate', 'Bill', 'Bill Rate $', 'Rate', 'Charge Rate'],
+        shift: ['Shift', 'Shift Description', 'Hours', 'Schedule', 'Shift Hours'],
+        shiftTime: ['Shift Time', 'Shift Duration', 'Hours', 'Time'],
+        margin: ['Margin', 'Margin %', 'GP%', 'Gross Profit'],
+        status: ['Status', 'Job Status', 'State'],
+        hiringManager: ['Hiring Manager', 'Manager', 'Reports To'],
+        
+        offerDate: ['Offer Date', 'Offer Extended'],
+        startDate: ['Start Date', 'Start', 'Est Start', 'Anticipated Start Date', 'Scheduled Start', 'Date of Start'],
+        endDate: ['End Date', 'End', 'Est End', 'Anticipated End Date'],
+        reqReason: ['Requisition Reason', 'Reason for Req'],
+        
+        // Decline Columns
+        hospDeclineDate: ['Hospital Decline Date', 'Client Decline Date'],
+        hospDeclineReason: ['Hospital Decline Reason', 'Client Decline Reason'],
+        agDeclineDate: ['Agency Decline Date', 'Vendor Decline Date'],
+        agDeclineReason: ['Agency Decline Reason', 'Reason', 'Vendor Decline Reason'],
+        
+        nextStep: ['Next Steps'],
+        avOpenDate: ['AV Open Date'],
+        history: ['Session Updates Log']
+      },
+
+      LEVER_LABELS: {
+        relaxRequirements: 'Relax Requirements',
+        adjStartPeriod: 'Adjusted Start Period',
+        autoOffer: 'Auto Offer',
+        flex48: 'Flex 48hr Schedule',
+        hotJob: 'Hot Job Promotion',
+        additionalRecruiter: 'Additional Recruiter Support',
+        recruiterIncentive: 'Recruiter Incentive',
+        payAdj: 'Pay/Margin Adjustment',
+        openToAVs: 'Open to AVs',
+        billRateIncrease: 'Bill Rate Increase'
+      },
+
+      AGING_RULES: {
+        'Inspira': { thresholds: { yellow: 6, red: 11, darkRed: 16 } },
+        'Capital Health': { thresholds: { yellow: 6, red: 11, darkRed: 15 } },
+        'default': { thresholds: { yellow: 6, red: 11, darkRed: 16 } }
+      },
+
+      NURSING_KEYWORDS: ['nursing', 'rn', 'nurse', 'lpn', 'cna', 'practitioner', 'midwife', 'crna'],
+      ALLIED_KEYWORDS: ['allied', 'tech', 'therapist', 'therapy', 'rad', 'sonographer', 'phlebotomy', 'assistant', 'technologist']
+    };
+
+    // ==========================
+    // 2. UTILITIES
+    // ==========================
+
+    // ============================================================================
+    // DATABASE FUNCTIONS
+    // ============================================================================
+    
+    /**
+     * Generate test data for demo/testing purposes
+     */
+    function generateTestData() {
+        const facilities = [
+            'Memorial Hospital', 'St. Mary\'s Medical Center', 'Community General', 
+            'Regional Healthcare', 'University Medical Center', 'City Hospital',
+            'Northside Medical', 'Southview Hospital', 'Eastside Regional'
+        ];
+        const specialties = [
+            'Emergency Room', 'ICU', 'Med/Surg', 'Telemetry', 'Operating Room',
+            'Labor & Delivery', 'PACU', 'Cardiac Cath Lab', 'Oncology'
+        ];
+        const systems = ['Travel Nursing', 'Per Diem', 'Local Contract', 'Perm Placement'];
+        
+        const testJobs = [];
+        const today = new Date();
+        
+        for (let i = 1; i <= 25; i++) {
+            const daysAgo = Math.floor(Math.random() * 60);
+            const dateAdded = new Date(today);
+            dateAdded.setDate(dateAdded.getDate() - daysAgo);
+            
+            const system = systems[Math.floor(Math.random() * systems.length)];
+            const billRate = (70 + Math.random() * 60).toFixed(2);
+            const margin = (15 + Math.random() * 20).toFixed(1);
+            
+            testJobs.push({
+                position_id: `REQ-${1000 + i}`,
+                req_id: `REQ-${1000 + i}`,
+                facility_name: facilities[Math.floor(Math.random() * facilities.length)],
+                specialty_name: specialties[Math.floor(Math.random() * specialties.length)],
+                program: system,
+                system: system,
+                date_added: dateAdded.toISOString(),
+                created_date: dateAdded.toISOString(),
+                bill_rate: `$${billRate}/hr`,
+                hiring_manager: 'John Smith',
+                manager: 'John Smith',
+                status: 'Open - Actively Recruiting',
+                notes: 'Open - Actively Recruiting',
+                margin: parseFloat(margin)
+            });
+        }
+        
+        return testJobs;
+    }
+    
+    /**
+     * Load position data from database via API
+     */
+    window.loadDataFromDatabase = async function() {
+        try {
+            Utils.setLoading(true, "Loading data from database...");
+            
+            let rawPositions;
+            let usingTestData = false;
+            
+            // Try to fetch from database first
+            try {
+                const positionsResponse = await fetch(DB_CONFIG.apiEndpoint);
+                if (!positionsResponse.ok) {
+                    throw new Error(`HTTP error! status: ${positionsResponse.status}`);
+                }
+                rawPositions = await positionsResponse.json();
+            } catch (fetchError) {
+                console.warn('Could not load from database, using test data:', fetchError);
+                rawPositions = generateTestData();
+                usingTestData = true;
+            }
+            
+            // Try to fetch changes
+            try {
+                const changesResponse = await fetch(DB_CONFIG.changesEndpoint);
+                if (changesResponse.ok) {
+                    const changesData = await changesResponse.json();
+                    changeLog = changesData.changes || [];
+                }
+            } catch (changesError) {
+                console.warn('Could not load changes from database:', changesError);
+                // Try localStorage in demo mode
+                try {
+                    const localChanges = localStorage.getItem('ghr_demo_changes');
+                    if (localChanges) {
+                        changeLog = JSON.parse(localChanges);
+                        console.log('Loaded changes from localStorage (demo mode)');
+                    } else {
+                        changeLog = [];
+                    }
+                } catch (localError) {
+                    console.warn('Could not load from localStorage either:', localError);
+                    changeLog = [];
+                }
+            }
+            
+            // Process the data (apply changes on top of base data)
+            const processedJobs = await processPositionData(rawPositions);
+            
+            // Load into app
+            window.store.state.jobs = processedJobs;
+            window.store.state.filename = usingTestData ? "Test Data (Demo Mode)" : "Database (Live)";
+            window.store.dispatch('REFRESH_UI');
+            
+            if (usingTestData) {
+                window.showToast(`Loaded ${processedJobs.length} test positions (Demo Mode - Database not connected)`, 'info');
+            } else {
+                window.showToast(`Loaded ${processedJobs.length} positions from database`, 'success');
+            }
+            
+            Utils.setLoading(false);
+            return true;
+        } catch (error) {
+            console.error('Error loading data:', error);
+            Utils.setLoading(false);
+            window.showToast('Error loading data: ' + error.message, 'error');
+            return false;
+        }
+    };
+    
+    /**
+     * Clean bill rate formatting
+     * Removes duplicate dollar signs and standardizes format
+     */
+    function cleanBillRate(billRate) {
+        if (!billRate) return '';
+        
+        let cleaned = String(billRate).trim();
+        
+        // Remove ALL dollar signs first
+        cleaned = cleaned.replace(/\$/g, '');
+        
+        // Remove common text like "/hr", "/hour", "per hour"
+        cleaned = cleaned.replace(/\/hr|\/hour|per hour/gi, '').trim();
+        
+        // Try to extract just the number
+        const num = parseFloat(cleaned);
+        
+        // If we got a valid number, format it properly
+        if (!isNaN(num) && num > 0) {
+            return `$${num.toFixed(2)}`;
+        }
+        
+        // If we can't parse it, just ensure single $ at the start
+        if (!cleaned.startsWith('$')) {
+            cleaned = '$' + cleaned;
+        }
+        
+        return cleaned;
+    }
+    
+    /**
+     * Process raw position data and apply changes
+     */
+    async function processPositionData(rawPositions) {
+        const jobMap = new Map();
+        
+        // Convert raw DB positions to job format
+        rawPositions.forEach(row => {
+            const job = {
+                id: String(row.position_id || row.id || row.req_id || ''),
+                positionId: String(row.position_id || row.req_id || ''),
+                system: String(row.program || row.system || ''),
+                program: String(row.program || row.system || ''),
+                facility: String(row.facility_name || row.facility || ''),
+                specialty: String(row.specialty_name || row.specialty || ''),
+                unit: String(row.unit_name || row.unit || ''),
+                dateAdded: Utils.toDateOrNull(row.date_added || row.created_date),
+                daysPast: 0,
+                billRate: cleanBillRate(row.bill_rate || ''),
+                shift: String(row.shift_hours || row.shift || 'N/A'),
+                shiftTime: String(row.shift_time || ''),
+                hiringManager: String(row.hiring_manager || row.manager || 'Unknown'),
+                status: String(row.status || row.notes || 'No updates'),
+                margin: row.margin || null,
+                ghrSubs: 0,
+                avSubs: 0,
+                ghrDeclines: 0,
+                avDeclines: 0,
+                candidates: [],
+                levers: {
+                    socialMedia: { done: false, user: '', time: '' },
+                    agencyOutreach: { done: false, user: '', time: '' },
+                    bonus: { done: false, user: '', time: '' },
+                    rateIncrease: { done: false, user: '', time: '' },
+                    openToAVs: { done: false, user: '', time: '' },
+                    hotSheet: { done: false, user: '', time: '' },
+                    hotJob: { done: false, user: '', time: '' },
+                    adjStartPeriod: { done: false, user: '', time: '' },
+                    flex48: { done: false, user: '', time: '' },
+                    autoOffer: { done: false, user: '', time: '' },
+                    relaxRequirements: { done: false, user: '', time: '' },
+                    additionalRecruiter: { done: false, user: '', time: '' },
+                    recruiterIncentive: { done: false, user: '', time: '' },
+                    payAdj: { done: false, user: '', time: '' }
+                },
+                nextStep: null,
+                avOpenDate: null,
+                history: [],
+                _raw: row
+            };
+            
+            if (job.dateAdded) {
+                job.daysPast = Utils.calcDays(job.dateAdded);
+            }
+            
+            jobMap.set(job.id, job);
+        });
+        
+        // Apply changes from change log
+        changeLog.forEach(change => {
+            const job = jobMap.get(change.jobId);
+            if (!job) return;
+            
+            switch (change.type) {
+                case 'lever_update':
+                    if (job.levers[change.data.leverKey]) {
+                        job.levers[change.data.leverKey] = {
+                            done: change.data.done === true,
+                            user: change.data.done ? change.data.user : '',
+                            time: change.data.done ? change.data.time : ''
+                        };
+                    }
+                    break;
+                case 'margin_update':
+                    job.margin = change.data.margin;
+                    break;
+                case 'next_step_update':
+                    job.nextStep = change.data.nextStep;
+                    break;
+                case 'av_open_date_update':
+                    job.avOpenDate = change.data.avOpenDate;
+                    break;
+                case 'history_update':
+                    if (Array.isArray(change.data.history)) {
+                        job.history = [...change.data.history];
+                    }
+                    break;
+            }
+        });
+        
+        return Array.from(jobMap.values());
+    }
+    
+    /**
+     * Record a change and save to database (or localStorage in demo mode)
+     */
+    async function recordChange(jobId, changeType, changeData) {
+        const change = {
+            id: `change-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString(),
+            jobId: jobId,
+            type: changeType,
+            data: changeData,
+            user: 'Current User'
+        };
+        
+        changeLog.push(change);
+        
+        try {
+            const response = await fetch(DB_CONFIG.changesEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(change)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            await createHistorySnapshot();
+            
+            console.log('Recorded change to database:', change);
+            return true;
+        } catch (error) {
+            // Fallback to localStorage in demo mode
+            console.warn('Could not save to database, using localStorage (demo mode):', error);
+            try {
+                localStorage.setItem('ghr_demo_changes', JSON.stringify(changeLog));
+                await createHistorySnapshot(); // Create snapshot in demo mode too
+                console.log('Recorded change to localStorage (demo mode):', change);
+                return true;
+            } catch (localError) {
+                console.error('Error saving to localStorage:', localError);
+                const idx = changeLog.findIndex(c => c.id === change.id);
+                if (idx > -1) {
+                    changeLog.splice(idx, 1);
+                }
+                return false;
+            }
+        }
+    }
+    
+    /**
+     * Create a history snapshot
+     */
+    async function createHistorySnapshot() {
+        try {
+            const timestamp = new Date().toISOString();
+            const snapshot = {
+                timestamp: timestamp,
+                changeCount: changeLog.length,
+                data: {
+                    metadata: {
+                        version: '1.0',
+                        lastUpdated: timestamp,
+                        totalChanges: changeLog.length
+                    },
+                    changes: changeLog
+                }
+            };
+            
+            try {
+                await fetch(DB_CONFIG.historyEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(snapshot)
+                });
+                console.log('Created history snapshot in database:', timestamp);
+            } catch (dbError) {
+                // Fallback to localStorage in demo mode
+                console.warn('Could not save snapshot to database, using localStorage');
+                const localHistory = JSON.parse(localStorage.getItem('ghr_demo_history') || '[]');
+                localHistory.push(snapshot);
+                // Keep only last 100 snapshots
+                if (localHistory.length > 100) {
+                    localHistory.splice(0, localHistory.length - 100);
+                }
+                localStorage.setItem('ghr_demo_history', JSON.stringify(localHistory));
+                console.log('Created history snapshot in localStorage:', timestamp);
+            }
+        } catch (error) {
+            console.error('Error creating history snapshot:', error);
+        }
+    }
+
+
+    const Utils = {
+      MS_PER_DAY: 1000 * 60 * 60 * 24,
+
+      setLoading(isLoading, text) {
+        const el = $('loadingOverlay');
+        const t = $('loadingText');
+        if (t && text) t.textContent = text;
+        if (!el) return;
+        el.classList.toggle('hidden', !isLoading);
+      },
+
+      safeJsonParse(val, fallback) {
+        try { return JSON.parse(val); } catch { return fallback; }
+      },
+
+      // Excel loves odd types. This makes it predictable.
+      asString(val) {
+        if (val == null) return '';
+        if (val instanceof Date) return val.toISOString();
+        return String(val).trim();
+      },
+
+      toDateOrNull(val) {
+        if (!val) return null;
+        if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+        // Handle Excel serials (numbers approx > 25569 which is year 1970)
+        if (typeof val === 'number' && val > 25569 && val < 2958465) {
+             return new Date(Math.round((val - 25569)*86400*1000));
+        }
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? null : d;
+      },
+
+      calcDays(d1) {
+        const d = d1 instanceof Date ? d1 : Utils.toDateOrNull(d1);
+        if (!d) return 0;
+        return Math.ceil((new Date() - d) / Utils.MS_PER_DAY);
+      },
+
+      redactName(fullName) {
+        if (!fullName) return '';
+        const parts = fullName.split(' ');
+        if (parts.length < 2) return fullName;
+        // Return First Name + Last Initial + .
+        return parts[0] + ' ' + parts[parts.length - 1].charAt(0) + '.';
+      },
+
+      calculateImpactPercent(levers) {
+        if (!levers) return 0;
+        const total = Object.keys(levers).length;
+        const completed = Object.values(levers).filter(l => l && l.done).length;
+        return total ? Math.round((completed / total) * 100) : 0;
+      },
+
+      getAgingColorClasses(days, system) {
+        const rules = CONSTANTS.AGING_RULES[system] || CONSTANTS.AGING_RULES.default;
+        const { yellow, red, darkRed } = rules.thresholds;
+        if (days >= darkRed) return 'bg-red-800 text-white border-red-900';
+        if (days >= red) return 'bg-[#EF4444] text-white border-red-600';
+        if (days >= yellow) return 'bg-[#FACC15] text-white border-yellow-600';
+        return 'bg-[#22C55E] text-white border-green-600';
+      },
+
+      abbreviate(text) {
+        if (!text) return '';
+        const MAP = { 'Registered Nurse': 'RN', 'Medical Surgical': 'MS', 'Med Surg': 'MS', 'Med/Surg': 'MS', 'Telemetry': 'TELE', 'Tele': 'TELE', 'Intensive Care Unit': 'ICU', 'Emergency Room': 'ER', 'Emergency Dept': 'ED', 'Emergency Department': 'ED', 'Operating Room': 'OR', 'Labor & Delivery': 'L&D', 'Labor and Delivery': 'L&D', 'Progressive Care Unit': 'PCU', 'Catheterization Lab': 'Cath Lab', 'Radiologic Technologist': 'Rad Tech', 'Certified Nursing Assistant': 'CNA', 'Medical Technologist': 'Med Tech' };
+        let s = String(text);
+        Object.keys(MAP).forEach(key => { s = s.replace(new RegExp(key, 'gi'), MAP[key]); });
+        return s.toUpperCase();
+      },
+
+      cleanFilterText(text) {
+        if (!text) return '';
+        const str = String(text);
+        if (str.includes('-')) {
+          const parts = str.split('-').map(p => p.trim());
+          if (parts.length === 2 && parts[0].toLowerCase() === parts[1].toLowerCase()) return parts[0];
+        }
+        return str;
+      },
+
+      inferSystem(fac = '') {
+        if (!fac) return 'Other';
+        const f = String(fac).toLowerCase();
+        
+        // PA/NJ/DE Regional System Mapping
+        if (f.includes('capital') || f.includes('hopewell') || f.includes('deborah')) return 'Capital Health';
+        if (f.includes('cooper') || f.includes('cape')) return 'Cooper';
+        if (f.includes('redeemer')) return 'Holy Redeemer';
+        if (f.includes('hunterdon')) return 'Hunterdon';
+        if (f.includes('inspira')) return 'Inspira';
+        if (f.includes('richmond') || f.includes('rumc')) return 'RUMC';
+        if (f.includes('st. luke') || f.includes('sellersville') || f.includes('miners') || f.includes('carbon') || f.includes('lehigh')) return 'St Lukes';
+        if (f.includes('penn') || f.includes('lancaster') || f.includes('chester') || f.includes('hup') || f.includes('presbyterian')) return 'UPHS';
+        if (f.includes('virtua')) return 'Virtua';
+        if (f.includes('jefferson') || f.includes('einstein') || f.includes('magee')) return 'Jefferson';
+        if (f.includes('main line') || f.includes('mlh') || f.includes('lankenau') || f.includes('paoli')) return 'Main Line Health';
+        if (f.includes('tower')) return 'Tower Health';
+        if (f.includes('temple') || f.includes('jeanes')) return 'Temple Health';
+        if (f.includes('trinity') || f.includes('mercy') || f.includes('st. mary') || f.includes('nazareth') || f.includes('st. francis')) return 'Trinity Health';
+        
+        return 'Other';
+      },
+
+      checkCategoryMatch(program, filterVal) {
+        if (!filterVal) return true;
+        return String(program || '').toLowerCase() === String(filterVal || '').toLowerCase();
+      },
+
+      renderChunks(items, container, renderFn, batchSize = 50, onComplete) {
+        if (!container) return;
+        container.innerHTML = '';
+        let index = 0;
+        if (items.length === 0) { if (onComplete) onComplete(); return; }
+        const renderBatch = () => {
+          const fragment = document.createDocumentFragment();
+          const limit = Math.min(index + batchSize, items.length);
+          for (; index < limit; index++) {
+            const wrapper = document.createElement('div');
+            const content = renderFn(items[index]);
+            if (typeof content === 'string') wrapper.innerHTML = content;
+            else wrapper.appendChild(content);
+            while (wrapper.firstChild) fragment.appendChild(wrapper.firstChild);
+          }
+          container.appendChild(fragment);
+          if (index < items.length) requestAnimationFrame(renderBatch);
+          else if (onComplete) onComplete();
+        };
+        renderBatch();
+      },
+
+      // Helps you debug without being a coder
+      prettyHeaderList(headers) {
+        return (headers || []).slice(0, 30).join(', ') + ((headers || []).length > 30 ? ' ...' : '');
+      }
+    };
+
+    // ==========================
+    // 3. GLOBAL EXPORTS
+    // ==========================
+    window.copySummary = async (btn) => {
+      const text = $('summaryText')?.value || '';
+      try { await navigator.clipboard.writeText(text); }
+      catch {
+        const el = $('summaryText');
+        if (el) { el.select(); document.execCommand('copy'); }
+      }
+      if (!btn) return;
+      const original = btn.innerText;
+      btn.innerText = 'Copied!';
+      setTimeout(() => btn.innerText = original, 1500);
+    };
+
+    window.exportData = () => {
+      if (window.store.state.jobs.length === 0) { window.showToast("No data to export", 'error'); return; }
+      Utils.setLoading(true, "Exporting...");
+      setTimeout(() => {
+        try {
+          const exportRows = window.store.state.jobs.map(job => {
+            const row = { ...(job._raw || {}) };
+            row['Current Margin'] = job.margin ? job.margin + '%' : '';
+            row['Next Steps'] = job.nextStep ? `[${job.nextStep.date || ''}] ${job.nextStep.text || ''}` : '';
+            row['AV Open Date'] = job.avOpenDate || '';
+            row['Shift Time'] = job.shiftTime || '';
+            row['Bill Rate'] = job.billRate;
+            if (job.levers) {
+                Object.entries(job.levers || {}).forEach(([key, val]) => {
+                row[`Lever: ${CONSTANTS.LEVER_LABELS[key]}`] = (val && val.done) ? `${val.user || ''} (${val.time || ''})` : '';
+                });
+            }
+            const interviews = (job.candidates || []).filter(c => c.interviewDate).map(c => `${c.name} (${c.interviewDate})`).join('; ');
+            if (interviews) row['Scheduled Interviews'] = interviews;
+            if (job.history && job.history.length > 0) row['Session Updates Log'] = JSON.stringify(job.history);
+            return row;
+          });
+
+          const ws = XLSX.utils.json_to_sheet(exportRows);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Updated_Positions");
+
+          const cleanName = (window.store.state.filename || 'Updated_Positions').replace(/\.[^/.]+$/, "");
+          const newName = cleanName.startsWith('Updated_') ? cleanName : `Updated_${cleanName}`;
+          XLSX.writeFile(wb, `${newName}.xlsx`);
+          window.showToast("Export successful!", "success");
+        } catch (e) {
+          console.error(e);
+          window.showToast("Export failed. Check console.", "error");
+        } finally {
+          Utils.setLoading(false);
+        }
+      }, 50);
+    };
+
+    // ==========================
+    // 4. DATA PROCESSING
+    // ==========================
+    const DataProcessor = {
+      // Normalize header names so "Position ID" and "PositionID" and "position id" match
+      normalizeHeader(h) {
+        return String(h || '')
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .replace(/[^a-z0-9 ]/g, ''); // removes punctuation
+      },
+
+      createHeaderMap(row) {
+        const map = {};
+        const rowKeys = Object.keys(row || {});
+        const usedHeaders = new Set();
+
+        const normalizedRowKeys = rowKeys.map(k => ({ raw: k, norm: DataProcessor.normalizeHeader(k) }));
+
+        for (const internalKey of Object.keys(CONSTANTS.COLUMN_MAP)) {
+          const variations = (CONSTANTS.COLUMN_MAP[internalKey] || []).map(v => DataProcessor.normalizeHeader(v));
+
+          // exact normalized match
+          let found = normalizedRowKeys.find(k => !usedHeaders.has(k.raw) && variations.includes(k.norm));
+
+          // contains match (more forgiving)
+          if (!found) {
+            found = normalizedRowKeys.find(k => {
+              if (usedHeaders.has(k.raw)) return false;
+              return variations.some(v => k.norm.includes(v) || v.includes(k.norm));
+            });
+          }
+
+          if (found) {
+            map[internalKey] = found.raw;
+            usedHeaders.add(found.raw);
+          }
+        }
+
+        return map;
+      },
+
+      normalizeRow(row, headerMap) {
+        const out = {};
+        for (const key in headerMap) out[key] = row[headerMap[key]];
+        return out;
+      }
+    };
+
+    window.processWorkbook = async (file, isMerge = false) => {
+      if (!file) return;
+      // Check if XLSX is loaded (common failure point)
+      if (typeof XLSX === 'undefined') {
+          alert("Excel library not loaded. Please refresh the page.");
+          return;
+      }
+
+      Utils.setLoading(true, isMerge ? "Merging Updates..." : "Importing Master...");
+      if (!isMerge) window.store.state.filename = file.name;
+
+      try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { cellDates: true });
+
+        const getSheetJson = (keys) => {
+          const name = workbook.SheetNames.find(n => keys.some(k => String(n).toLowerCase().includes(String(k).toLowerCase())));
+          return name ? XLSX.utils.sheet_to_json(workbook.Sheets[name], { defval: "" }) : [];
+        };
+
+        const rawJobs = getSheetJson(['Open Positions', 'Positions', 'Updated_Positions']);
+
+        if (rawJobs.length === 0) {
+          window.showToast("No positions found. Check sheet name (expected something like Open Positions).", 'error');
+          return;
+        }
+
+        const jobHeaderMap = DataProcessor.createHeaderMap(rawJobs[0]);
+
+        // HARD STOP with a useful message if ID cannot be found
+        if (!jobHeaderMap.id) {
+          const headers = Object.keys(rawJobs[0] || {});
+          window.showToast(
+            "Import failed. I could not detect the ID column. Your file usually uses 'Position ID'.",
+            "error"
+          );
+          window.showToast(
+            "Headers I see: " + Utils.prettyHeaderList(headers),
+            "info"
+          );
+          return;
+        }
+
+        // IF MERGE: update existing jobs only
+        if (isMerge) {
+          const existingJobs = window.store.state.jobs;
+          let mergeCount = 0;
+
+          rawJobs.forEach(r => {
+            const n = DataProcessor.normalizeRow(r, jobHeaderMap);
+            const id = Utils.asString(n.id);
+            if (!id) return;
+
+            const existingJob = existingJobs.find(j => j.id === id);
+            if (!existingJob) return;
+
+            if (!existingJob.levers) existingJob.levers = {}; // Init if missing
+
+            Object.keys(CONSTANTS.LEVER_LABELS).forEach(k => {
+              const leverKey = `Lever: ${CONSTANTS.LEVER_LABELS[k]}`;
+              const cell = r[leverKey];
+              if (cell) existingJob.levers[k] = { done: true, user: String(cell), time: 'Merged' };
+            });
+
+            const marginCol = Object.keys(r).find(k => String(k).toLowerCase().includes('margin') || String(k).toLowerCase().includes('gp'));
+            if (marginCol && r[marginCol]) {
+              const m = parseFloat(r[marginCol]);
+              if (Number.isFinite(m)) existingJob.margin = m.toFixed(1);
+            }
+
+            if (n.nextStep && String(n.nextStep).startsWith('[')) {
+              existingJob.nextStep = { text: String(n.nextStep), date: new Date().toLocaleDateString(), user: 'Imported' };
+            }
+
+            if (n.avOpenDate) existingJob.avOpenDate = n.avOpenDate;
+
+            if (n.history) {
+              const parsed = Utils.safeJsonParse(String(n.history), []);
+              if (Array.isArray(parsed) && parsed.length > 0) existingJob.history = [...(existingJob.history || []), ...parsed];
+            }
+
+            mergeCount++;
+          });
+
+          window.store.dispatch('REFRESH_UI');
+          window.showToast(`Merged updates for ${mergeCount} positions!`, 'success');
+          return;
+        }
+
+        // MASTER IMPORT (Reset)
+        const jobMap = new Map();
+        const savedEdits = Utils.safeJsonParse(localStorage.getItem('ghr_impact_edits') || '[]', []);
+        const editMap = new Map(savedEdits.map(e => [String(e.id), e]));
+
+        rawJobs.forEach(r => {
+          const n = DataProcessor.normalizeRow(r, jobHeaderMap);
+          const id = Utils.asString(n.id);
+          if (!id) return;
+
+          const dateAdded = Utils.toDateOrNull(n.dateAdded) || new Date();
+          const prog = String(n.program || 'Uncategorized');
+          const isFlex48 = prog.includes('48');
+
+          let initLevers = {};
+          for (const k in CONSTANTS.LEVER_LABELS) initLevers[k] = { done: false };
+          if (isFlex48) initLevers.flex48 = { done: true, user: 'System', time: 'Auto' };
+
+          Object.keys(CONSTANTS.LEVER_LABELS).forEach(k => {
+            const leverKey = `Lever: ${CONSTANTS.LEVER_LABELS[k]}`;
+            const cell = r[leverKey];
+            if (cell) initLevers[k] = { done: true, user: String(cell), time: '' };
+          });
+
+          let savedMargin = null, savedNextStep = null, savedAV = null, savedHistory = [];
+          if (editMap.has(id)) {
+            const edit = editMap.get(id);
+            initLevers = { ...initLevers, ...(edit.levers || {}) };
+            savedMargin = edit.margin ?? null;
+            savedNextStep = edit.nextStep ?? null;
+            savedAV = edit.avOpenDate ?? null;
+            savedHistory = edit.history || [];
+          }
+
+          if (savedHistory.length === 0 && n.history) {
+            const parsed = Utils.safeJsonParse(String(n.history), []);
+            if (Array.isArray(parsed)) savedHistory = parsed;
+          }
+
+          if (!savedNextStep && n.nextStep && String(n.nextStep).startsWith('[')) {
+            savedNextStep = { text: String(n.nextStep), date: '', user: '' };
+          }
+
+          // Enhanced System Logic: Trim whitespace to ensure empty strings trigger inference
+          const rawSys = n.system ? String(n.system).trim() : '';
+          const systemVal = rawSys.length > 0 ? rawSys : Utils.inferSystem(n.facility);
+
+          // Fix for margin calculation error
+          let calcMargin = 26;
+          if (savedMargin !== null && !isNaN(parseFloat(savedMargin))) {
+            calcMargin = parseFloat(savedMargin);
+          } else if (n.margin !== undefined && n.margin !== null && !isNaN(parseFloat(n.margin))) {
+            calcMargin = parseFloat(n.margin);
+          }
+
+          // Sync "Open to AVs" lever with avOpenDate property
+          if (savedAV || n.avOpenDate) {
+             initLevers.openToAVs = { done: true, user: 'System', time: savedAV || n.avOpenDate };
+          }
+
+          jobMap.set(id, {
+            id,
+            system: systemVal,
+            facility: n.facility || 'Unknown',
+            program: prog,
+            specialty: n.specialty || 'General',
+            unit: n.unit || '',
+            dateAdded,
+            daysPast: Utils.calcDays(dateAdded),
+            // Safe parse bill rate
+            billRate: isNaN(parseFloat(n.billRate)) ? "0" : parseFloat(n.billRate).toFixed(0),
+            shift: String(n.shift || 'N/A'), // Safe string
+            shiftTime: String(n.shiftTime || ''), // Safe string
+            margin: calcMargin.toFixed(1),
+            hiringManager: n.hiringManager || 'Unknown',
+            status: n.status || 'Open',
+            ghrSubs: 0, avSubs: 0, ghrDeclines: 0, avDeclines: 0,
+            candidates: [],
+            levers: initLevers,
+            _raw: r,
+            nextStep: savedNextStep,
+            avOpenDate: savedAV || n.avOpenDate || null,
+            history: savedHistory
+          });
+        });
+
+        // Submissions
+        const rawSubs = getSheetJson(['Submission', 'Candidate']);
+        if (rawSubs.length > 0) {
+          const subHeaderMap = DataProcessor.createHeaderMap(rawSubs[0]);
+
+          rawSubs.forEach(r => {
+            const n = DataProcessor.normalizeRow(r, subHeaderMap);
+            const jId = Utils.asString(n.id);
+            const job = jobMap.get(jId);
+            if (!job) return;
+
+            const agency = String(n.agency || 'Unknown');
+            const isGHR = agency.toLowerCase().includes('ghr') || agency.toLowerCase().includes('internal');
+            const status = String(n.status || 'Submitted');
+            
+            // Logic to determine Decline Type
+            const hospDeclineDate = Utils.toDateOrNull(n.hospDeclineDate);
+            const agDeclineDate = Utils.toDateOrNull(n.agDeclineDate);
+            const offerDate = Utils.toDateOrNull(n.offerDate);
+            
+            const isRetracted = status.toLowerCase().includes('retract') || status.toLowerCase().includes('withdrawn');
+            const isOfferDeclined = status.toLowerCase().includes('offer declined') || (offerDate && (status.toLowerCase().includes('decline') || status.toLowerCase().includes('reject')));
+            const isHospDeclined = !!hospDeclineDate;
+            const isAgDeclined = !!agDeclineDate;
+            
+            const isDeclined = isRetracted || isOfferDeclined || isHospDeclined || isAgDeclined || status.toLowerCase().includes('decline') || status.toLowerCase().includes('reject');
+
+            if (isDeclined) { isGHR ? job.ghrDeclines++ : job.avDeclines++; }
+            else { isGHR ? job.ghrSubs++ : job.avSubs++; }
+
+            const subDate = Utils.toDateOrNull(n.subDate);
+            let alertData = null;
+
+            if (subDate && !isDeclined) {
+              const days = Utils.calcDays(subDate);
+              if (days >= 16) alertData = { text: "⛔ Verify Availability", level: 'dark-red' };
+              else if (days >= 11) alertData = { text: "🔥 Loss Risk - Schedule", level: 'red' };
+              else if (days >= 6) alertData = { text: "⚠️ Confirm Interview", level: 'yellow' };
+              else alertData = { text: "✅ New Submission", level: 'green' }; // 1-5 Days
+            }
+
+            // Determine Reason Text
+            let declineReasonText = '';
+            let declineDate = null;
+            let declineTypeLabel = '';
+
+            if (isRetracted) {
+                declineTypeLabel = 'Retracted';
+                declineReasonText = 'Candidate Withdrew';
+            } else if (isOfferDeclined) {
+                declineTypeLabel = 'Offer Declined';
+                declineReasonText = n.agDeclineReason || n.hospDeclineReason || 'Offer turned down';
+                declineDate = agDeclineDate || hospDeclineDate;
+            } else if (isHospDeclined) {
+                declineTypeLabel = 'Hospital Declined';
+                declineReasonText = n.hospDeclineReason;
+                declineDate = hospDeclineDate;
+            } else if (isAgDeclined) {
+                declineTypeLabel = 'Agency Declined';
+                declineReasonText = n.agDeclineReason;
+                declineDate = agDeclineDate;
+            } else if (isDeclined) {
+                declineTypeLabel = 'Declined';
+                declineReasonText = n.hospDeclineReason || n.agDeclineReason || 'See Status';
+            }
+
+            job.candidates.push({
+              name: n.candidate ? String(n.candidate) : 'Candidate',
+              agency,
+              status,
+              isDeclined,
+              declineType: declineTypeLabel,
+              declineReason: declineReasonText,
+              declineDate: declineDate,
+              date: subDate,
+              offerDate: offerDate,
+              reqReason: n.reqReason, // Captured here
+              alert: alertData,
+              interviewDate: null
+            });
+          });
+        }
+
+        // Stats sheets (optional)
+        const getSheetArray = (keys) => {
+          const name = workbook.SheetNames.find(n => keys.some(k => String(n).toLowerCase().includes(String(k).toLowerCase())));
+          return name ? XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: "" }) : [];
+        };
+
+        const parseStatRows = (rows) => {
+          if (rows.length < 2) return [];
+          return rows.slice(1).map(r => ({
+            facility: r[1] || 'Unknown',
+            system: Utils.inferSystem(r[1]),
+            agency: r[2] || 'Unknown',
+            specialty: r[3] || 'General',
+            startDate: Utils.toDateOrNull(r[4]),
+            endDate: Utils.toDateOrNull(r[5])
+          })).filter(x => x.startDate);
+        };
+
+        const onAssignmentData = parseStatRows(getSheetArray(['On Assignment', 'Active']));
+        const upcomingData = parseStatRows(getSheetArray(['New Upcoming', 'Starts']));
+
+        window.store.dispatch('LOAD_DATA', {
+          jobs: Array.from(jobMap.values()),
+          statsData: { onAssignment: onAssignmentData, upcoming: upcomingData }
+        });
+
+        window.showToast("Import successful!", "success");
+
+      } catch (err) {
+        console.error(err);
+        window.showToast("Error processing file. If it is an MSP export, the sheet name or headers may be different.", "error");
+      } finally {
+        Utils.setLoading(false);
+      }
+    };
+
+    // ==========================
+    // 5. VIEW / RENDER
+    // ==========================
+    const View = {
+      initFilters() {
+        const s = window.store.state;
+        const allFacilities = new Set(s.jobs.map(j => j.facility).filter(Boolean));
+        View.renderDropdown('systemFilterContainer', 'systems', s.filters.systems, false);
+        View.renderDropdown('facilityFilterContainer', 'facilities', allFacilities, false);
+        View.renderDropdown('categoryFilterContainer', 'categories', s.filters.categories, true);
+        View.renderDropdown('specialtyFilterContainer', 'specialties', s.filters.specialties, false);
+        lucide.createIcons();
+      },
+
+      renderDropdown(id, key, set, isCategory) {
+        const container = $(id);
+        if (!container) return;
+        const sorted = Array.from(set || []).filter(x => x != null && String(x).trim() !== '').sort();
+        const labelMap = { systems: 'SYSTEM', facilities: 'FACILITY', categories: 'CATEGORY', specialties: 'SPECIALTY/DEPT' };
+
+        let optionsHtml = '';
+        if (isCategory) {
+          optionsHtml += `
+            <div class="p-2 hover:bg-slate-50 cursor-pointer flex gap-2 items-center"
+                 onclick="window.store.dispatch('TOGGLE_FILTER',{type:'${key}',val:'All Nursing'})">
+              <div class="w-4 h-4 border rounded flex items-center justify-center border-slate-300" id="chk-${key}-AllNursing"></div>
+              <span class="text-sm font-bold text-blue-700">All Nursing</span>
+            </div>
+            <div class="p-2 hover:bg-slate-50 cursor-pointer flex gap-2 items-center"
+                 onclick="window.store.dispatch('TOGGLE_FILTER',{type:'${key}',val:'All Allied'})">
+              <div class="w-4 h-4 border rounded flex items-center justify-center border-slate-300" id="chk-${key}-AllAllied"></div>
+              <span class="text-sm font-bold text-purple-700">All Allied</span>
+            </div>
+            <div class="h-px bg-slate-200 my-1"></div>
+          `;
+        }
+
+        optionsHtml += `
+          <div class="p-2 hover:bg-slate-50 cursor-pointer flex gap-2 items-center"
+               onclick="window.store.dispatch('TOGGLE_FILTER',{type:'${key}',val:'All'})">
+            <div class="w-4 h-4 border rounded flex items-center justify-center border-slate-300 bg-slate-100" id="chk-${key}-All">
+              <i data-lucide="check" class="w-3 h-3"></i>
+            </div>
+            <span class="text-sm font-bold">All (Clear)</span>
+          </div>
+          <div class="h-px bg-slate-200 my-1"></div>
+        `;
+
+        optionsHtml += sorted.map(opt => {
+          const strOpt = String(opt);
+          const safeOpt = strOpt.replace(/'/g, "\\'");
+          const safeId = strOpt.replace(/[^a-zA-Z0-9]/g, '');
+          return `
+            <div class="p-2 hover:bg-slate-50 cursor-pointer flex gap-2 items-center"
+                 onclick="window.store.dispatch('TOGGLE_FILTER',{type:'${key}',val:'${safeOpt}'})">
+              <div class="w-4 h-4 border rounded flex items-center justify-center border-slate-300" id="chk-${key}-${safeId}"></div>
+              <span class="text-sm whitespace-nowrap">${strOpt}</span>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">${labelMap[key]}</label>
+          <div onclick="View.toggleDropdown(this,event)" class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm font-medium shadow-sm flex justify-between cursor-pointer">
+            <span class="truncate" id="hdr-${key}">All</span>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400"></i>
+          </div>
+          <div class="multi-select-dropdown p-2">${optionsHtml}</div>
+        `;
+      },
+
+      updateFilterUI(key) {
+        const set = window.store.state.filterSelection[key];
+        const isAll = set.size === 0;
+        const idMap = { systems: 'systemFilterContainer', facilities: 'facilityFilterContainer', categories: 'categoryFilterContainer', specialties: 'specialtyFilterContainer' };
+
+        const hdr = $(`hdr-${key}`);
+        if (hdr) hdr.innerText = isAll ? "All" : (set.size === 1 ? Array.from(set)[0] : `${set.size} Selected`);
+
+        const container = $(idMap[key]);
+        if (!container) return;
+
+        const checkboxes = container.querySelectorAll('[id^="chk-"]');
+        checkboxes.forEach(chk => { chk.className = "w-4 h-4 border rounded flex items-center justify-center border-slate-300 bg-white"; chk.innerHTML = ""; });
+
+        const markChecked = (id) => {
+          const el = $(id);
+          if (!el) return;
+          el.className = "w-4 h-4 border rounded flex items-center justify-center bg-blue-600 border-blue-600";
+          el.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        };
+
+        if (isAll) markChecked(`chk-${key}-All`);
+        else {
+          set.forEach(val => markChecked(`chk-${key}-${String(val).replace(/[^a-zA-Z0-9]/g, '')}`));
+        }
+      },
+
+      updateFacilityOptions() {
+        const s = window.store.state;
+        const validSystems = s.filterSelection.systems;
+        const newFacilities = new Set();
+        s.jobs.forEach(item => {
+          const sys = item.system;
+          if (validSystems.size === 0 || validSystems.has(sys)) newFacilities.add(item.facility);
+        });
+        View.renderDropdown('facilityFilterContainer', 'facilities', newFacilities, false);
+        View.updateFilterUI('facilities');
+        lucide.createIcons();
+      },
+
+      renderTags(mode) {
+        const container = $('tagContainer');
+        if (!container) return;
+
+        container.innerHTML = CONSTANTS.TEAM_MEMBERS.map(m => {
+          const safeName = m.name.replace(/'/g, "\\'");
+          let clickAction = "";
+          if (mode === 'next_step') clickAction = `document.getElementById('nextStepText').value += '@${safeName} ';`;
+          if (mode === 'lever') clickAction = `document.getElementById('leverTagInput').value = '${safeName}';`;
+          return `<span class="inline-block bg-slate-100 hover:bg-blue-100 text-slate-700 text-[10px] px-2 py-1 rounded cursor-pointer border border-slate-200 transition-colors" onclick="${clickAction}">${m.name}</span>`;
+        }).join('');
+      },
+
+      toggleDropdown(el, event) {
+        event.stopPropagation();
+        const parent = el.parentElement;
+        const wasOpen = parent.classList.contains('open');
+        document.querySelectorAll('.multi-select-container').forEach(c => c.classList.remove('open'));
+        if (!wasOpen) parent.classList.add('open');
+      },
+
+      viewToggle() {
+        const view = window.store.state.view;
+        $('listViewWrapper')?.classList.toggle('hidden', view !== 'list');
+        $('hotJobsViewWrapper')?.classList.toggle('hidden', view !== 'hotjobs');
+        $('statsViewWrapper')?.classList.toggle('hidden', view !== 'stats');
+        $('kpiContainer')?.classList.toggle('hidden', view !== 'list');
+
+        const btnList = $('btnViewList');
+        const btnHot = $('btnViewHot');
+        const btnStats = $('btnViewStats');
+
+        const activeClass = "px-4 py-1.5 text-xs font-bold rounded-md transition-colors bg-blue-50 text-blue-700 shadow-sm border border-blue-100";
+        const inactiveClass = "px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700";
+
+        if (btnList) btnList.className = view === 'list' ? activeClass : inactiveClass;
+        if (btnHot) btnHot.className = view === 'hotjobs' ? activeClass : "px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700 flex items-center gap-1";
+        if (btnStats) btnStats.className = view === 'stats' ? activeClass : inactiveClass;
+      },
+
+      main() {
+        const v = window.store.state.view;
+        if (v === 'list') this.list();
+        else if (v === 'hotjobs') this.hotJobs();
+        else if (v === 'stats') this.stats();
+        lucide.createIcons();
+      },
+
+      getFilteredJobs(s) {
+        return s.jobs.filter(j => {
+          const sysMatch = s.filterSelection.systems.size === 0 || s.filterSelection.systems.has(j.system);
+          const facMatch = s.filterSelection.facilities.size === 0 || s.filterSelection.facilities.has(j.facility);
+          const specMatch = s.filterSelection.specialties.size === 0 || s.filterSelection.specialties.has(Utils.cleanFilterText(j.specialty));
+          const catMatch = s.filterSelection.categories.size === 0 || Array.from(s.filterSelection.categories).some(cv => Utils.checkCategoryMatch(j.program, cv));
+
+          let ageMatch = true;
+          if (s.filters.ageMin !== null && j.daysPast < s.filters.ageMin) ageMatch = false;
+          if (s.filters.ageMax !== null && j.daysPast > s.filters.ageMax) ageMatch = false;
+
+          let searchMatch = true;
+          // Corrected to use s.searchQuery instead of s.filters.searchId
+          if (s.searchQuery) {
+            // Check ID, and also allow searching by candidate name for quick lookup
+            const idMatch = String(j.id || '').toLowerCase().includes(s.searchQuery);
+            // Optional: Search candidate names too? The user asked for "Search ID", usually strictly ID is better to avoid noise.
+            // Sticking to ID per request, ensuring partial match works.
+            searchMatch = idMatch; 
+          }
+
+          return sysMatch && facMatch && specMatch && catMatch && ageMatch && searchMatch;
+        });
+      },
+
+      list() {
+        const s = window.store.state;
+        const list = this.getFilteredJobs(s).sort((a, b) => {
+          const k = s.sort.key;
+          let valA = a[k], valB = b[k];
+          if (k === 'billRate' || k === 'margin') { valA = parseFloat(valA); valB = parseFloat(valB); }
+          if (k === 'impact') { valA = Utils.calculateImpactPercent(a.levers); valB = Utils.calculateImpactPercent(b.levers); }
+          if (valA < valB) return s.sort.dir === 'asc' ? -1 : 1;
+          if (valA > valB) return s.sort.dir === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        this.kpis(list);
+
+        const container = $('jobsContainer');
+        if (!container) return;
+
+        if (list.length === 0 && s.jobs.length > 0) { container.innerHTML = '<div class="p-8 text-center text-slate-400">No jobs match filters</div>'; return; }
+        if (list.length === 0) { container.innerHTML = '<div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400"><i data-lucide="inbox" class="w-12 h-12 mb-2 opacity-50"></i><p>No data loaded. Click "Load from Database" to begin.</p></div>'; return; }
+
+        Utils.renderChunks(list, container, (job) => {
+          const div = document.createElement('div');
+          div.id = `row-${job.id}`;
+          div.innerHTML = this.buildRowHtml(job);
+          return div;
+        }, 50, () => lucide.createIcons());
+
+        this.legend();
+      },
+
+      hotJobs() {
+        const s = window.store.state;
+        const list = this.getFilteredJobs(s)
+          .filter(j => j.levers && j.levers.hotJob && j.levers.hotJob.done);
+
+        const container = document.getElementById('hotJobsContainer');
+        if (!container) return;
+
+        // Reset container classes for list view (remove grid if present)
+        container.className = "flex-1 overflow-y-auto scroller p-6 space-y-8";
+
+        if (list.length === 0) {
+          container.innerHTML = '<div class="p-8 text-center text-slate-400">No hot jobs selected. Use the flame icon in list view to select hot jobs.</div>';
+          return;
+        }
+
+        // 1. Group by System -> Facility -> Specialty
+        const hierarchy = {};
+
+        list.forEach(job => {
+            const sys = job.system || 'Other';
+            const fac = job.facility || 'Unknown Facility';
+            const spec = job.specialty || 'General';
+
+            if (!hierarchy[sys]) hierarchy[sys] = {};
+            if (!hierarchy[sys][fac]) hierarchy[sys][fac] = {};
+            if (!hierarchy[sys][fac][spec]) hierarchy[sys][fac][spec] = [];
+
+            hierarchy[sys][fac][spec].push(job);
+        });
+
+        // 2. Build HTML
+        const systems = Object.keys(hierarchy).sort();
+        let html = '';
+
+        systems.forEach(sys => {
+            html += `
+                <div class="animate-in slide-in-from-bottom-2 duration-300">
+                    <h2 class="text-xl font-bold text-slate-800 mb-4 pb-2 border-b-2 border-slate-200 flex items-center gap-2">
+                        <i data-lucide="building-2" class="w-6 h-6 text-blue-600"></i> ${sys}
+                    </h2>
+                    <div class="space-y-6 pl-2 md:pl-4">
+            `;
+
+            const facilities = Object.keys(hierarchy[sys]).sort();
+            facilities.forEach(fac => {
+                html += `
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <i data-lucide="map-pin" class="w-4 h-4"></i> ${fac}
+                        </h3>
+                        <div class="space-y-3">
+                `;
+
+                const specialties = Object.keys(hierarchy[sys][fac]).sort();
+                specialties.forEach(spec => {
+                    const jobs = hierarchy[sys][fac][spec];
+                    // Sort jobs by rate descending
+                    jobs.sort((a, b) => parseFloat(b.billRate) - parseFloat(a.billRate));
+                    
+                    const volume = jobs.length;
+                    const maxRate = Math.max(...jobs.map(j => parseFloat(j.billRate)));
+                    const minRate = Math.min(...jobs.map(j => parseFloat(j.billRate)));
+                    // Safe display logic to avoid NaN
+                    const rateDisplay = (minRate !== maxRate && !isNaN(minRate)) 
+                        ? `$${minRate.toFixed(0)} - $${maxRate.toFixed(0)}` 
+                        : (!isNaN(maxRate) ? `$${maxRate.toFixed(0)}` : 'N/A');
+                    
+                    html += `
+                        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden transition-all hover:shadow-md">
+                            <!-- Group Header -->
+                            <div class="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center cursor-pointer select-none"
+                                 onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.chevron').classList.toggle('rotate-180')">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="chevron-down" class="chevron w-4 h-4 text-slate-400 transition-transform duration-200"></i>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="font-bold text-slate-700 text-sm">${spec}</h4>
+                                            ${volume > 1 ? `<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-200 shadow-sm">${volume} Openings</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                     <div class="text-sm font-bold text-green-700">${rateDisplay} <span class="text-xs font-normal text-slate-400">/hr</span></div>
+                                </div>
+                            </div>
+                            
+                            <div class="divide-y divide-slate-100">
+                    `;
+
+                    jobs.forEach(job => {
+                        const isNew = job.daysPast <= 3;
+                        
+                        // Icon Logic
+                        const shiftLower = (String(job.shift || '') + ' ' + String(job.shiftTime || '')).toLowerCase();
+                        let icon = '<i data-lucide="clock" class="w-3 h-3 text-slate-400"></i>'; // Default
+                        if(shiftLower.includes('night') || shiftLower.includes('7p') || shiftLower.includes('19:00') || shiftLower.includes('noc')) {
+                            icon = '<i data-lucide="moon" class="w-3 h-3 text-indigo-500 fill-indigo-100"></i>';
+                        } else if (shiftLower.includes('day') || shiftLower.includes('7a') || shiftLower.includes('07:00')) {
+                            icon = '<i data-lucide="sun" class="w-3 h-3 text-orange-500 fill-orange-100"></i>';
+                        }
+
+                        // Metrics Calculations
+                        const impact = Utils.calculateImpactPercent(job.levers || {});
+                        const activeLeversList = Object.entries(job.levers || {})
+                            .filter(([k, v]) => v.done)
+                            .map(([k, v]) => CONSTANTS.LEVER_LABELS[k])
+                            .join(', ') || 'No levers active';
+
+                        // Check Per Diem
+                        const isPerDiem = (job.shift || '').toLowerCase().includes('per diem') || (job.program || '').toLowerCase().includes('per diem');
+
+                        html += `
+                            <div class="p-3 hover:bg-blue-50/30 flex items-center justify-between gap-2 group text-xs transition-colors cursor-pointer"
+                                 onclick="store.dispatch('GO_TO_JOB', '${job.id}')" title="Click to view details in List">
+                                
+                                <!-- ID & Status -->
+                                <div class="flex items-center gap-3 w-36 shrink-0">
+                                     ${isNew ? '<span class="text-[9px] font-bold text-red-600 bg-red-50 px-1 py-0.5 rounded border border-red-100">NEW</span>' : ''}
+                                     ${isPerDiem ? '<span class="text-[9px] font-bold text-purple-600 bg-purple-50 px-1 py-0.5 rounded border border-purple-100">PD</span>' : ''}
+                                     <span class="font-mono text-slate-400 group-hover:text-blue-600 hover:underline">#${job.id}</span>
+                                </div>
+                                
+                                <!-- Shift & Unit -->
+                                <div class="w-40 shrink-0 grid grid-cols-1 gap-1">
+                                     <div class="font-medium text-slate-700 truncate flex items-center gap-1.5" title="${job.shift} ${job.shiftTime || ''}">
+                                         ${icon} ${job.shift} ${job.shiftTime || ''}
+                                     </div>
+                                     <div class="truncate text-slate-500" title="${job.unit || 'No Unit'}">${job.unit || ''}</div>
+                                </div>
+
+                                <!-- Key Metrics (Age, Subs, Decs, Impact) -->
+                                <div class="flex-1 grid grid-cols-4 gap-2 border-l border-r border-slate-100 px-4 items-center">
+                                     <!-- Days -->
+                                     <div class="flex flex-col items-center">
+                                         <span class="font-bold text-slate-700">${job.daysPast}</span>
+                                         <span class="text-[9px] text-slate-400 uppercase tracking-wide">Days</span>
+                                     </div>
+                                     
+                                     <!-- Subs Breakdown -->
+                                     <div class="flex flex-col items-center">
+                                         <div class="flex gap-1 text-xs font-bold">
+                                            <span class="text-blue-600" title="GHR Submissions">${job.ghrSubs}</span>
+                                            <span class="text-slate-300">/</span>
+                                            <span class="text-purple-600" title="AV Submissions">${job.avSubs}</span>
+                                         </div>
+                                         <span class="text-[9px] text-slate-400 uppercase tracking-wide">Subs (G/A)</span>
+                                     </div>
+
+                                     <!-- Declines Breakdown -->
+                                     <div class="flex flex-col items-center">
+                                         <div class="flex gap-1 text-xs font-bold">
+                                            <span class="text-red-500" title="GHR Declines">${job.ghrDeclines}</span>
+                                            <span class="text-slate-300">/</span>
+                                            <span class="text-red-400" title="AV Declines">${job.avDeclines}</span>
+                                         </div>
+                                         <span class="text-[9px] text-slate-400 uppercase tracking-wide">Dec (G/A)</span>
+                                     </div>
+
+                                     <!-- Impact -->
+                                     <div class="flex flex-col items-center cursor-help" title="Active Levers: ${activeLeversList}">
+                                         <span class="font-bold text-emerald-600 border-b border-dotted border-emerald-300">${impact}%</span>
+                                         <span class="text-[9px] text-slate-400 uppercase tracking-wide">Impact</span>
+                                     </div>
+                                </div>
+
+                                <!-- Financials -->
+                                <div class="flex items-center gap-6 shrink-0 text-right pl-2">
+                                     <div class="w-16 flex flex-col justify-center">
+                                         <div class="font-bold text-slate-700">${job.billRate}</div>
+                                         <div class="text-[9px] text-slate-400 font-medium uppercase">Bill</div>
+                                     </div>
+                                     <div class="w-12 hidden sm:flex flex-col justify-center">
+                                         <div class="font-bold ${(parseFloat(job.margin) < 20) ? 'text-red-500' : 'text-green-600'}">${job.margin}%</div>
+                                         <div class="text-[9px] text-slate-400 font-medium uppercase">Mrgn</div>
+                                     </div>
+                                     <button class="text-slate-300 hover:text-red-500 transition-colors p-1"
+                                             title="Remove from Hot Jobs"
+                                             onclick="event.stopPropagation(); store.dispatch('TOGGLE_HOT_JOB','${job.id}')">
+                                         <i data-lucide="x-circle" class="w-4 h-4"></i>
+                                     </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        lucide.createIcons();
+      },
+
+      rowUpdate(id) {
+        const job = window.store.state.jobs.find(j => j.id === id);
+        if (!job) return;
+        const row = $(`row-${id}`);
+        if (!row) return;
+        row.innerHTML = this.buildRowHtml(job);
+        lucide.createIcons();
+      },
+
+      buildRowHtml(job) {
+        const s = window.store.state;
+        const expanded = s.expandedRows.has(job.id);
+        const impact = Utils.calculateImpactPercent(job.levers);
+        const isPerm = String(job.program).toLowerCase().includes('perm');
+
+        const colorClass = isPerm ? 'border border-slate-500 text-slate-700 bg-white' : Utils.getAgingColorClasses(job.daysPast, job.system);
+        const color = isPerm ? '' : colorClass.split(' ')[0];
+        const bubbleText = isPerm ? 'text-slate-700' : (color.includes('slate') ? 'text-slate-800' : 'text-white');
+        const bubbleClasses = isPerm ? 'border border-slate-500 bg-white' : `${color}`;
+
+        const abbrSpecialty = Utils.abbreviate(job.specialty);
+        const cleanSpec = abbrSpecialty.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const cleanUnit = (job.unit || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const showUnit = job.unit && cleanUnit !== cleanSpec && !cleanUnit.includes(cleanSpec) && !cleanSpec.includes(cleanUnit);
+
+        const isHot = job.levers && job.levers.hotJob && job.levers.hotJob.done;
+        const totalDeclines = job.ghrDeclines + job.avDeclines;
+
+        let html = `
+          <div class="grid grid-cols-12 p-4 items-center hover:bg-slate-50 cursor-pointer group transition-colors" onclick="window.store.dispatch('TOGGLE_ROW','${job.id}')">
+            <div class="col-span-1 flex items-center gap-2">
+              <button onclick="event.stopPropagation(); window.store.dispatch('TOGGLE_HOT_JOB','${job.id}')" class="shrink-0 transition-transform hover:scale-110">
+                <i data-lucide="flame" class="w-4 h-4 ${isHot ? 'hot-job-active' : 'text-slate-300 hover:text-orange-400'}"></i>
+              </button>
+              <span class="px-2 py-1 rounded text-xs font-bold ${colorClass}">${job.id}</span>
+            </div>
+            <div class="col-span-1 text-xs truncate font-medium text-slate-700" title="${job.program}">${job.program}</div>
+            <div class="col-span-3 pr-4 pl-2">
+              <div class="text-[10px] uppercase font-bold text-slate-400">${job.system}</div>
+              <div class="font-bold text-sm truncate">${job.facility}</div>
+              <div class="text-xs text-slate-500 truncate" title="${job.shift} ${job.shiftTime ? `(${job.shiftTime})` : ''}">
+                ${abbrSpecialty}${showUnit ? ` • ${job.unit}` : ''}${job.shiftTime ? ` • ${job.shiftTime}` : ''}
+              </div>
+            </div>
+            <div class="col-span-1 text-center font-bold text-slate-700 text-xs">${job.billRate}</div>
+            <div class="col-span-1 text-center">
+              <span class="inline-flex font-bold text-xs ${bubbleClasses} ${bubbleText} rounded-full w-8 h-8 items-center justify-center mx-auto">${job.daysPast}</span>
+            </div>
+            <div class="col-span-1 text-center font-bold text-slate-700 hover:text-blue-600 z-10"
+                 onclick="event.stopPropagation(); window.store.dispatch('OPEN_MODAL',{type:'margin',jobId:'${job.id}',val:'${job.margin}'})">${job.margin}%</div>
+            <div class="col-span-1 text-center font-bold text-slate-700">${impact}%</div>
+            <div class="col-span-1 text-center font-medium text-slate-700"><span class="text-blue-600">${job.ghrSubs}</span> <span class="text-slate-300">/</span> <span class="text-blue-600">${job.avSubs}</span></div>
+            <div class="col-span-2 text-center font-medium text-slate-700 ${totalDeclines > 0 ? 'cursor-help hover:bg-slate-100 rounded transition-colors group-declines' : ''}"
+                 onclick="${totalDeclines > 0 ? `event.stopPropagation(); window.store.dispatch('ANALYZE_DECLINES',{id:'${job.id}'})` : ''}"
+                 title="${totalDeclines > 0 ? 'Click to Analyze' : ''}">
+                 <span class="text-red-500">${job.ghrDeclines}</span> <span class="text-slate-300">/</span> <span class="text-red-500">${job.avDeclines}</span>
+                 ${totalDeclines > 0 ? '<i data-lucide="pie-chart" class="w-3 h-3 text-slate-400 inline ml-1 opacity-0 group-hover:opacity-100 group-[.group-declines]:opacity-50"></i>' : ''}
+            </div>
+            <div class="col-span-1 text-center"><i data-lucide="${expanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-slate-400 group-hover:text-blue-600"></i></div>
+          </div>
+        `;
+
+        if (expanded) {
+          const view = s.rowSubView[job.id] || 'active';
+          const cands = job.candidates.filter(c => view === 'active' ? !c.isDeclined : c.isDeclined);
+
+          // --- LEVER SORTING LOGIC (Columnar Flow with Next Step Spanning Bottom) ---
+          
+          // Define Tier groups
+          const LEVER_GROUPS = [
+              { name: "Tier 1. Program Management Levers", keys: ['adjStartPeriod', 'flex48', 'autoOffer', 'relaxRequirements'] },
+              { name: "Tier 2. Recruitment Levers", keys: ['additionalRecruiter', 'hotJob', 'recruiterIncentive', 'payAdj'] },
+              { name: "Tier 3. Final Levers", keys: ['openToAVs', 'billRateIncrease'] }
+          ];
+
+          let leverGridHtml = '';
+          
+          LEVER_GROUPS.forEach(group => {
+              leverGridHtml += `
+                <div class="mb-4 last:mb-0">
+                    <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 border-b border-slate-100 pb-1">${group.name}</h5>
+                    <div class="grid grid-cols-2 gap-2">
+                        ${group.keys.map(k => {
+                            const v = job.levers[k] || { done: false };
+                            return `
+                                <div class="border p-2 rounded bg-white flex items-center gap-2 ${v.done ? 'border-indigo-500 bg-indigo-50' : 'hover:border-slate-300'} cursor-pointer"
+                                     onclick="${v.done ? `window.store.dispatch('TOGGLE_LEVER_OFF',{id:'${job.id}',key:'${k}'})` : `window.store.dispatch('OPEN_MODAL',{type:'lever',jobId:'${job.id}',key:'${k}'})`}">
+                                    <div class="w-4 h-4 shrink-0 border rounded flex items-center justify-center ${v.done ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}">
+                                        ${v.done ? '<i data-lucide="check" class="text-white w-3 h-3"></i>' : ''}
+                                    </div>
+                                    <div class="flex flex-col min-w-0">
+                                        <span class="text-xs font-medium text-slate-700 leading-tight">${CONSTANTS.LEVER_LABELS[k]}</span>
+                                        ${v.done ? `<span class="text-[9px] text-slate-500 font-medium mt-0.5 block truncate">${v.user || ''}</span>` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+              `;
+          });
+
+          // -------------------------------------------
+
+          html += `
+            <div class="bg-slate-50 p-6 border-b shadow-inner cursor-auto fade-in" onclick="event.stopPropagation()">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <h4 class="font-bold mb-3 text-sm uppercase text-slate-500">Impact Levers</h4>
+                  
+                  <div class="space-y-2">
+                    ${leverGridHtml}
+                  </div>
+                  
+                  ${job.avOpenDate ? `<div class="mt-4 text-xs bg-purple-50 p-2 border border-purple-200 rounded text-purple-800 flex items-center gap-2"><i data-lucide="calendar" class="w-3 h-3"></i> <strong>AV Opened:</strong> ${job.avOpenDate}</div>` : ''}
+                </div>
+
+                <div>
+                  <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-bold text-sm uppercase text-slate-500">Submission Log</h4>
+                        ${totalDeclines > 0 ? `
+                        <button onclick="event.stopPropagation(); window.store.dispatch('ANALYZE_DECLINES',{id:'${job.id}'})" class="text-[10px] bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-2 py-0.5 rounded flex items-center gap-1 transition-colors shadow-sm" title="Analyze Decline Reasons">
+                            <i data-lucide="pie-chart" class="w-3 h-3"></i> Analyze
+                        </button>` : ''}
+                    </div>
+                    <div class="flex bg-white border rounded p-0.5">
+                      <button class="px-3 py-0.5 text-xs font-bold rounded ${view==='active' ? 'bg-blue-100 text-blue-700' : 'text-slate-400'}"
+                              onclick="window.store.dispatch('SET_SUB_VIEW',{id:'${job.id}',view:'active'})">Active</button>
+                      <button class="px-3 py-0.5 text-xs font-bold rounded ${view==='declined' ? 'bg-red-100 text-red-700' : 'text-slate-400'}"
+                              onclick="window.store.dispatch('SET_SUB_VIEW',{id:'${job.id}',view:'declined'})">Declined</button>
+                    </div>
+                  </div>
+
+                  <div class="bg-white border rounded h-56 overflow-y-auto p-0 text-xs mb-3">
+                    ${cands.length === 0 ? '<div class="p-4 text-center text-slate-400 italic">No candidates found</div>' : cands.map((c) => {
+                      const originalIndex = job.candidates.indexOf(c);
+                      const daysAgo = c.date ? Utils.calcDays(c.date) : '-';
+                      const subDateStr = c.date ? c.date.toLocaleDateString() : 'N/A';
+                      
+                      const agLower = (c.agency || '').toLowerCase();
+                      const isInternal = agLower.includes('ghr') || agLower.includes('planet');
+                      const isGHR = agLower.includes('ghr');
+                      const isPlanet = agLower.includes('planet');
+
+                      // Redaction Logic: Only redact if NOT internal/partner
+                      const displayName = (s.redactMode && !isInternal) ? Utils.redactName(c.name) : c.name;
+                      const displayAgency = (s.redactMode && !isInternal) ? 'Vendor' : c.agency;
+
+                      // Styling Logic
+                      let rowBgClass = 'hover:bg-slate-50 border-transparent';
+                      let nameColorClass = 'text-slate-800';
+                      let badgeClass = 'text-slate-400';
+
+                      if (isGHR) {
+                          rowBgClass = 'bg-blue-50/40 hover:bg-blue-50 border-blue-100';
+                          nameColorClass = 'text-blue-900';
+                          badgeClass = 'text-blue-500 font-bold';
+                      } else if (isPlanet) {
+                          rowBgClass = 'bg-purple-50/40 hover:bg-purple-50 border-purple-100';
+                          nameColorClass = 'text-purple-900';
+                          badgeClass = 'text-purple-500 font-bold';
+                      }
+
+                      // Center Content: Status / Reason / Alerts
+                      let centerContent = '';
+                      if (c.isDeclined) {
+                          centerContent = `<div class="text-red-700 font-bold truncate" title="${c.declineType}">${c.declineType}</div>`;
+                          if (c.declineReason) centerContent += `<div class="text-slate-500 truncate italic" title="${c.declineReason}">${c.declineReason}</div>`;
+                      } else {
+                          // Active Candidate Prompts
+                          if (c.offerDate) {
+                              centerContent = `<div class="text-green-600 font-bold bg-green-50 px-1 rounded inline-block">Offer Pending</div>`;
+                          } else {
+                              const alertColor = c.alert ? (c.alert.level === 'green' ? 'text-emerald-600' : (c.alert.level === 'yellow' ? 'text-amber-600' : 'text-red-600')) : 'text-slate-500';
+                              centerContent = `<div class="${alertColor} font-bold uppercase tracking-wide truncate" title="${c.alert ? c.alert.text : 'Pending'}">${c.alert ? c.alert.text : 'Pending'}</div>`;
+                          }
+                          if(c.reqReason) centerContent += `<div class="text-slate-400 italic truncate" title="${c.reqReason}">Req: ${c.reqReason}</div>`;
+                      }
+
+                      // Right Content: Dates
+                      let rightContent = `<div class="font-mono text-slate-500 text-[10px]">Sub: ${subDateStr}</div>`;
+                      if(c.date) rightContent += `<div class="font-bold text-slate-700">${daysAgo}d ago</div>`;
+                      
+                      if (c.isDeclined && c.declineDate) {
+                          rightContent += `<div class="text-red-400 text-[9px] mt-0.5">Dec: ${c.declineDate.toLocaleDateString()}</div>`;
+                      }
+
+                      return `
+                        <div class="px-3 py-2 border-b last:border-0 transition-colors cursor-pointer grid grid-cols-12 gap-2 items-center ${rowBgClass}"
+                             onclick="window.store.dispatch('OPEN_MODAL',{type:'candidate_action',jobId:'${job.id}',candidateIndex:${originalIndex}})">
+                          
+                          <!-- Left: Name & Agency -->
+                          <div class="col-span-4 min-w-0">
+                            <div class="font-bold ${nameColorClass} truncate" title="${displayName}">${displayName}</div>
+                            <div class="text-[10px] uppercase tracking-wider ${badgeClass} truncate" title="${displayAgency}">${displayAgency}</div>
+                          </div>
+                          
+                          <!-- Center: Status & Notes -->
+                          <div class="col-span-5 min-w-0">
+                            ${centerContent}
+                          </div>
+
+                          <!-- Right: Dates -->
+                          <div class="col-span-3 text-right">
+                            ${rightContent}
+                          </div>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+
+                  <!-- Next Steps (Moved Here) -->
+                  <div class="border border-slate-200 border-dashed p-3 rounded bg-slate-50/50 flex flex-col gap-2">
+                     <button class="w-full bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-2 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                            onclick="window.store.dispatch('OPEN_MODAL',{type:'next_step',jobId:'${job.id}'})">
+                      <i data-lucide="message-square" class="w-3 h-3"></i> ${job.nextStep ? 'Update Next Step' : 'Add Next Step'}
+                     </button>
+                     ${job.nextStep ? `<div class="text-[10px] text-yellow-800 bg-yellow-50 p-2 rounded border border-yellow-100 leading-snug break-words whitespace-pre-wrap">${job.nextStep.text} <em class="block mt-1 text-slate-400 font-normal not-italic">(${job.nextStep.user || 'Unknown'})</em></div>` : ''}
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        return html;
+      },
+
+      kpis(list) {
+        const total = list.length;
+        const container = $('kpiContainer');
+        const s = window.store.state;
+        if (!container) return;
+
+        const now = new Date();
+        const activeContractsFiltered = (s.statsData.onAssignment || []).filter(r => {
+          const sysMatch = s.filterSelection.systems.size === 0 || (r.system && s.filterSelection.systems.has(r.system));
+          const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
+          const isActive = r.startDate && r.startDate <= now && (!r.endDate || r.endDate >= now);
+          return sysMatch && facMatch && isActive;
+        });
+
+        const activeCount = activeContractsFiltered.length;
+        const fillRate = (activeCount + total) > 0 ? Math.round((activeCount / (activeCount + total)) * 100) : 0;
+
+        if (!total) {
+          container.innerHTML = `
+            <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-center items-center text-slate-400">
+              <span class="text-xs font-bold uppercase tracking-wider">Total Openings</span>
+              <span class="text-2xl font-bold mt-1">-</span>
+            </div>`;
+          lucide.createIcons();
+          return;
+        }
+
+        const avgDays = Math.round(list.reduce((a, b) => a + b.daysPast, 0) / total);
+        const avgMargin = (list.reduce((a, b) => a + parseFloat(b.margin || 0), 0) / total).toFixed(1);
+
+        let pendingDaysSum = 0, pendingCount = 0, ghr = 0, av = 0, critical = 0;
+        list.forEach(j => {
+          ghr += j.ghrSubs; av += j.avSubs;
+          const rules = CONSTANTS.AGING_RULES[j.system] || CONSTANTS.AGING_RULES.default;
+          if (j.daysPast >= rules.thresholds.red) critical++;
+          (j.candidates || []).forEach(c => { if (!c.isDeclined && c.date) { pendingDaysSum += Utils.calcDays(c.date); pendingCount++; } });
+        });
+
+        const avgPending = pendingCount ? Math.round(pendingDaysSum / pendingCount) : 0;
+        const totalSubs = ghr + av;
+        const ghrPct = totalSubs ? Math.round((ghr / totalSubs) * 100) : 0;
+        const avPct = totalSubs ? Math.round((av / totalSubs) * 100) : 0;
+
+        const cards = [
+          { label: 'Avg Days Open', val: avgDays, icon: 'clock', color: 'purple' },
+          { label: 'Submission Pending', val: `${avgPending} Days`, icon: 'hourglass', color: 'orange' },
+          { label: 'Active Sub Mix', val: `${ghrPct}% / ${avPct}%`, icon: 'users', color: 'blue' },
+          { label: 'Avg Margin', val: avgMargin + '%', icon: 'trending-up', color: 'green' },
+          { label: 'Total Jobs', val: `${total} / <span class="text-red-500">${critical}</span>`, icon: 'alert-triangle', color: 'red' },
+          { label: 'Fill Rate / Active', val: `${fillRate}% / ${activeCount}`, icon: 'check-circle', color: 'emerald' }
+        ];
+
+        container.innerHTML = cards.map(c => `
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${c.label}</span>
+              <i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i>
+            </div>
+            <div class="text-2xl font-bold text-slate-800">${c.val}</div>
+          </div>
+        `).join('');
+
+        lucide.createIcons();
+      },
+
+      legend() {
+        const el = $('legendContainer');
+        if (!el) return;
+        el.innerHTML = `
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-[#22C55E]"></div> 1-5 Days</div>
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-[#FACC15]"></div> 6-10 Days</div>
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-[#EF4444]"></div> 11-15 Days</div>
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-800"></div> 16+ Days</div>
+          <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full border border-slate-500 bg-white"></div> Perm</div>
+        `;
+      },
+
+      stats() {
+        const s = window.store.state;
+        const container = $('statsContent');
+        if (!container) return;
+
+        if (!s.statsData || (!s.statsData.onAssignment?.length && !s.statsData.upcoming?.length)) {
+          container.innerHTML = `<div class="p-6 text-slate-500 bg-slate-50 border border-slate-200 rounded">No stats sheets found. Import a file that includes “On Assignment / Active” and optional “New Upcoming / Starts”.</div>`;
+          return;
+        }
+
+        const buckets = [];
+        for (let i = 0; i < 4; i++) {
+          const end = new Date(); end.setDate(end.getDate() - (i * 7)); end.setHours(23, 59, 59, 999);
+          const start = new Date(end); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0);
+          const labelDate = start.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+          buckets.push({ label: `Week of ${labelDate}`, start, end });
+        }
+
+        const metrics = buckets.map(bucket => {
+          const activeAssignments = (s.statsData.onAssignment || []).filter(r => {
+            const sysMatch = s.filterSelection.systems.size === 0 || (r.system && s.filterSelection.systems.has(r.system));
+            const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
+            const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
+            if (!(sysMatch && facMatch && specMatch)) return false;
+            return r.startDate <= bucket.end && (!r.endDate || r.endDate >= bucket.start);
+          });
+
+          const totalOnAssg = activeAssignments.length;
+          const ghrGroup = activeAssignments.filter(r => String(r.agency || '').toLowerCase().includes('ghr') || String(r.agency || '').toLowerCase().includes('planet'));
+          const ghrCount = ghrGroup.length;
+          const agencyCount = totalOnAssg - ghrCount;
+          const fulfillment = totalOnAssg > 0 ? ((ghrCount / totalOnAssg) * 100).toFixed(1) : 0;
+
+          const filteredUpcoming = (s.statsData.upcoming || []).filter(r => {
+            const sysMatch = s.filterSelection.systems.size === 0 || (r.system && s.filterSelection.systems.has(r.system));
+            const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
+            const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
+            return sysMatch && facMatch && specMatch;
+          });
+
+          const allRows = [...activeAssignments, ...filteredUpcoming];
+          const newStarts = allRows.filter(r => r.startDate >= bucket.start && r.startDate <= bucket.end).length;
+
+          return { label: bucket.label, totalOnAssg, ghrCount, agencyCount, fulfillment, newStarts };
+        });
+
+        container.innerHTML = `
+          <div class="grid grid-cols-5 gap-4 mb-8">
+            <div class="col-span-1 bg-slate-100 p-4 rounded-l-lg flex flex-col justify-center border-y border-l border-slate-200 font-bold text-slate-600 text-sm">
+              <div class="h-10 flex items-center">Metric</div>
+              <div class="h-10 flex items-center border-t border-slate-200">Total On Assignment</div>
+              <div class="h-10 flex items-center border-t border-slate-200 text-blue-600">GHR On Assignment</div>
+              <div class="h-10 flex items-center border-t border-slate-200 text-purple-600">Agency On Assignment</div>
+              <div class="h-10 flex items-center border-t border-slate-200">GHR Fulfillment %</div>
+              <div class="h-10 flex items-center border-t border-slate-200 text-emerald-600">New Starts</div>
+            </div>
+            ${metrics.map(m => `
+              <div class="col-span-1 bg-white p-4 border-y border-r border-slate-200 text-center text-sm">
+                <div class="h-10 flex items-center justify-center font-bold text-slate-800 bg-slate-50 -mx-4 -mt-4 mb-4 border-b">${m.label}</div>
+                <div class="h-10 flex items-center justify-center font-bold text-slate-800">${m.totalOnAssg}</div>
+                <div class="h-10 flex items-center justify-center font-medium text-blue-600 border-t border-slate-100">${m.ghrCount}</div>
+                <div class="h-10 flex items-center justify-center font-medium text-purple-600 border-t border-slate-100">${m.agencyCount}</div>
+                <div class="h-10 flex items-center justify-center font-bold text-slate-700 border-t border-slate-100">${m.fulfillment}%</div>
+                <div class="h-10 flex items-center justify-center font-bold text-emerald-600 border-t border-slate-100">${m.newStarts}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+            <h4 class="font-bold text-slate-700 mb-4">4-Week Trend Analysis</h4>
+            <div class="h-64"><canvas id="trendChart"></canvas></div>
+          </div>
+        `;
+
+        const chartData = [...metrics].reverse();
+        const ctx = $('trendChart')?.getContext?.('2d');
+        if (!ctx) return;
+
+        if (window.__trendChart) {
+          try { window.__trendChart.destroy(); } catch {}
+          window.__trendChart = null;
+        }
+
+        window.__trendChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: chartData.map(m => m.label),
+            datasets: [
+              { label: 'Total On Assignment', data: chartData.map(m => m.totalOnAssg), borderColor: '#475569', tension: 0.3 },
+              { label: 'GHR Count', data: chartData.map(m => m.ghrCount), borderColor: '#2563EB', tension: 0.3 },
+              { label: 'New Starts', data: chartData.map(m => m.newStarts), borderColor: '#10B981', borderDash: [5, 5], tension: 0.1 }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+
+        lucide.createIcons();
+      }
+    };
+
+    // ==========================
+    // 6. STORE
+    // ==========================
+    window.store = {
+      state: {
+        jobs: [],
+        statsData: { onAssignment: [], upcoming: [] },
+        filters: { systems: new Set(), facilities: new Set(), categories: new Set(), specialties: new Set(), ageMin: null, ageMax: null, searchId: '' },
+        filterSelection: { systems: new Set(), facilities: new Set(), categories: new Set(), specialties: new Set() },
+        searchQuery: '',
+        view: 'list',
+        expandedRows: new Set(),
+        rowSubView: {},
+        sort: { key: 'daysPast', dir: 'desc' },
+        modal: { open: false, type: null, jobId: null, key: null, val: null, candidateIndex: null },
+        sessionLog: [],
+        filename: 'Updated_Positions',
+        redactMode: false
+      },
+
+      dispatch(action, payload) {
+        const s = this.state;
+
+        try {
+          switch (action) {
+            case 'LOAD_DATA': {
+              s.jobs = payload.jobs || [];
+              s.statsData = payload.statsData || { onAssignment: [], upcoming: [] };
+
+              s.filters.systems = new Set(s.jobs.map(j => j.system).filter(Boolean));
+              s.filters.facilities = new Set(s.jobs.map(j => j.facility).filter(Boolean));
+              s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
+              s.filters.specialties = new Set(s.jobs.map(j => j.specialty).filter(Boolean));
+
+              ['systems', 'facilities', 'categories', 'specialties'].forEach(k => {
+                const valid = s.filters[k];
+                const selected = s.filterSelection[k];
+                Array.from(selected).forEach(v => { if (!valid.has(v)) selected.delete(v); });
+              });
+
+              View.initFilters();
+              View.viewToggle();
+              View.main();
+              break;
+            }
+
+            case 'REFRESH_UI': {
+              View.viewToggle();
+              View.main();
+              break;
+            }
+
+            case 'TOGGLE_FILTER': {
+              const { type, val } = payload || {};
+              const set = s.filterSelection[type];
+              if (!set) break;
+
+              if (val === 'All') set.clear();
+              else if (val === 'All Nursing') {
+                s.filterSelection.categories.clear();
+                Array.from(s.filters.categories).filter(c => CONSTANTS.NURSING_KEYWORDS.some(k => String(c).toLowerCase().includes(k))).forEach(c => s.filterSelection.categories.add(c));
+              } else if (val === 'All Allied') {
+                s.filterSelection.categories.clear();
+                Array.from(s.filters.categories).filter(c => CONSTANTS.ALLIED_KEYWORDS.some(k => String(c).toLowerCase().includes(k))).forEach(c => s.filterSelection.categories.add(c));
+              } else {
+                if (set.has(val)) set.delete(val);
+                else set.add(val);
+              }
+
+              View.updateFilterUI(type);
+
+              if (type === 'systems') {
+                s.filterSelection.facilities.clear();
+                View.updateFacilityOptions();
+              }
+
+              View.main();
+              break;
+            }
+
+            case 'SET_SEARCH_ID': {
+              const val = document.getElementById('searchId').value;
+              s.filters.searchId = val.trim().toLowerCase();
+              View.main();
+              break;
+            }
+
+            case 'SET_AGE_RANGE': {
+              const min = $('minAge')?.value ?? '';
+              const max = $('maxAge')?.value ?? '';
+              s.filters.ageMin = min !== '' ? parseInt(min, 10) : null;
+              s.filters.ageMax = max !== '' ? parseInt(max, 10) : null;
+              View.main();
+              break;
+            }
+
+            case 'SET_SEARCH': {
+              s.searchQuery = payload.trim().toLowerCase();
+              View.main();
+              break;
+            }
+
+            case 'TOGGLE_PRIVACY': {
+              const code = prompt("Enter Admin Code to Toggle Privacy Mode:");
+              if (code === '2026') {
+                  s.redactMode = !s.redactMode;
+                  const btn = $('privacyIcon');
+                  if (btn) {
+                      if (s.redactMode) {
+                          btn.setAttribute('data-lucide', 'eye-off');
+                          btn.classList.add('text-red-400');
+                          window.showToast("Privacy Mode Enabled", "success");
+                      } else {
+                          btn.setAttribute('data-lucide', 'eye');
+                          btn.classList.remove('text-red-400');
+                          window.showToast("Privacy Mode Disabled", "info");
+                      }
+                      lucide.createIcons();
+                  }
+                  View.main(); // Re-render to update names
+              } else {
+                  window.showToast("Incorrect Code", "error");
+              }
+              break;
+            }
+
+            case 'SET_VIEW': {
+              s.view = payload;
+              View.viewToggle();
+              View.main();
+              break;
+            }
+
+            case 'SORT': {
+              if (s.sort.key === payload) s.sort.dir = s.sort.dir === 'asc' ? 'desc' : 'asc';
+              else { s.sort.key = payload; s.sort.dir = 'desc'; }
+              View.main();
+              break;
+            }
+
+            case 'TOGGLE_ROW': {
+              const id = payload;
+              if (s.expandedRows.has(id)) s.expandedRows.delete(id);
+              else s.expandedRows.add(id);
+              if (!s.rowSubView[id]) s.rowSubView[id] = 'active';
+              View.rowUpdate(id);
+              break;
+            }
+
+            case 'TOGGLE_HOT_JOB': {
+              const id = payload;
+              const job = s.jobs.find(j => j.id === id);
+              if (!job) break;
+
+              const current = job.levers.hotJob.done;
+              job.levers.hotJob.done = !current;
+
+              if (!current) {
+                job.levers.hotJob.user = "List Toggle";
+                job.levers.hotJob.time = new Date().toLocaleDateString();
+              }
+
+              const dataToSave = s.jobs.map(j2 => ({
+                id: j2.id, levers: j2.levers, margin: j2.margin,
+                nextStep: j2.nextStep, avOpenDate: j2.avOpenDate, history: j2.history
+              }));
+              // Data now saved via recordChange() function
+
+              if (s.view === 'hotjobs') View.hotJobs();
+              else View.rowUpdate(id);
+
+              break;
+            }
+
+            case 'GO_TO_JOB': {
+              const id = payload;
+              this.dispatch('SET_VIEW', 'list');
+              
+              // Slight delay to allow DOM to render list view
+              setTimeout(() => {
+                  const row = document.getElementById(`row-${id}`);
+                  if (row) {
+                      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      // Add highlight effect
+                      row.classList.add('bg-blue-50');
+                      setTimeout(() => row.classList.remove('bg-blue-50'), 2000);
+                      
+                      // Expand row if not expanded
+                      if (!s.expandedRows.has(id)) {
+                          this.dispatch('TOGGLE_ROW', id);
+                      }
+                  }
+              }, 100);
+              break;
+            }
+
+            case 'SET_SUB_VIEW': {
+              s.rowSubView[payload.id] = payload.view;
+              View.rowUpdate(payload.id);
+              break;
+            }
+
+            case 'OPEN_MODAL': {
+              // Special override: If opening the 'Open to AVs' lever, redirect to the Open AV modal logic
+              if (payload.type === 'lever' && payload.key === 'openToAVs') {
+                  payload.type = 'open_av';
+              }
+
+              s.modal = { open: true, ...payload };
+
+              const modalTitle = $('modalTitle');
+              const standardInput = $('standardInputContainer');
+              const nextStepInput = $('nextStepContainer');
+              const dateInput = $('dateInputContainer');
+              const leverInput = $('leverInputContainer');
+              const commonTags = $('commonTagContainer');
+              const candidateActions = $('candidateActionContainer');
+              const summaryView = $('summaryContainer');
+              const removeReasonInput = $('removeReasonContainer');
+              const confirmBtn = $('modalConfirmBtn');
+
+              if (!modalTitle || !confirmBtn) break;
+
+              standardInput?.classList.add('hidden');
+              nextStepInput?.classList.add('hidden');
+              dateInput?.classList.add('hidden');
+              leverInput?.classList.add('hidden');
+              commonTags?.classList.add('hidden');
+              candidateActions?.classList.add('hidden');
+              summaryView?.classList.add('hidden');
+              removeReasonInput?.classList.add('hidden');
+              $('marginInputContainer')?.classList.add('hidden');
+
+              confirmBtn.classList.remove('hidden');
+              if ($('leverTagInput')) $('leverTagInput').value = "";
+              if ($('candidateActionType')) $('candidateActionType').value = "";
+
+              if (payload.type === 'margin') {
+                modalTitle.innerText = "Update Margin";
+                standardInput?.classList.remove('hidden');
+                $('marginInputContainer')?.classList.remove('hidden');
+                if ($('modalMarginValue')) $('modalMarginValue').value = payload.val ?? '';
+                leverInput?.classList.remove('hidden');
+                commonTags?.classList.remove('hidden');
+                View.renderTags('lever');
+
+              } else if (payload.type === 'next_step') {
+                modalTitle.innerText = "Add Next Step / Action";
+                nextStepInput?.classList.remove('hidden');
+                commonTags?.classList.remove('hidden');
+                if ($('nextStepText')) $('nextStepText').value = "";
+                View.renderTags('next_step');
+
+              } else if (payload.type === 'open_av') {
+                modalTitle.innerText = "Open to Agency Vendors";
+                dateInput?.classList.remove('hidden');
+                if ($('modalDateInput')) $('modalDateInput').valueAsDate = new Date();
+                if ($('dateInputLabel')) $('dateInputLabel').innerText = "Date Opened to AV";
+                leverInput?.classList.remove('hidden');
+                commonTags?.classList.remove('hidden');
+                View.renderTags('lever');
+
+              } else if (payload.type === 'lever') {
+                modalTitle.innerText = "Confirm Lever & Assign";
+                leverInput?.classList.remove('hidden');
+                commonTags?.classList.remove('hidden');
+                View.renderTags('lever');
+
+              } else if (payload.type === 'candidate_action') {
+                modalTitle.innerText = "Candidate Actions";
+                const job = s.jobs.find(j => j.id === payload.jobId);
+                const cand = job?.candidates?.[payload.candidateIndex];
+                if ($('candidateNameDisplay')) $('candidateNameDisplay').innerText = cand?.name || 'Candidate';
+                candidateActions?.classList.remove('hidden');
+
+              } else if (payload.type === 'summary') {
+                modalTitle.innerText = payload.title || "AI Session Notes";
+                summaryView?.classList.remove('hidden');
+                confirmBtn.classList.add('hidden');
+              }
+
+              $('actionModal')?.classList.remove('hidden');
+              lucide.createIcons();
+              break;
+            }
+
+            case 'CLOSE_MODAL': {
+              s.modal.open = false;
+              $('actionModal')?.classList.add('hidden');
+              break;
+            }
+
+            case 'CONFIRM_MODAL': {
+              const job = s.jobs.find(j => j.id === s.modal.jobId);
+              if (!job) { this.dispatch('CLOSE_MODAL'); break; }
+              if (!job.history) job.history = [];
+
+              const tag = $('leverTagInput')?.value || '';
+              const pushLog = (type, desc, tagVal) => {
+                const item = { jobId: job.id, type, desc, tag: tagVal || null, time: new Date().toLocaleString() };
+                s.sessionLog.push(item);
+                job.history.push(item);
+              };
+
+              if (s.modal.type === 'lever') {
+                if (!tag) { window.showToast("Please tag a team member.", 'error'); return; }
+                job.levers[s.modal.key] = { done: true, user: tag, time: new Date().toLocaleDateString() };
+                pushLog('Action', CONSTANTS.LEVER_LABELS[s.modal.key], tag);
+                
+                // Save to database
+                recordChange(job.id, 'lever_update', {
+                  leverKey: s.modal.key,
+                  done: true,
+                  user: tag,
+                  time: new Date().toLocaleDateString()
+                });
+
+              } else if (s.modal.type === 'margin') {
+                if (!tag) { window.showToast("Please tag a team member.", 'error'); return; }
+                const raw = $('modalMarginValue')?.value ?? '';
+                const num = parseFloat(raw);
+                if (Number.isFinite(num)) {
+                  const old = job.margin;
+                  job.margin = num.toFixed(1);
+                  pushLog('Margin', `${old}% -> ${job.margin}%`, tag);
+                  
+                  // Save to database
+                  recordChange(job.id, 'margin_update', {
+                    margin: job.margin,
+                    user: tag
+                  });
+                }
+
+              } else if (s.modal.type === 'next_step') {
+                const text = $('nextStepText')?.value?.trim() || '';
+                if (text) {
+                  job.nextStep = { text, date: new Date().toLocaleDateString(), user: 'Session User' };
+                  pushLog('Next Step', text, null);
+                  
+                  // Save to database
+                  recordChange(job.id, 'next_step_update', {
+                    nextStep: job.nextStep
+                  });
+                }
+
+              } else if (s.modal.type === 'open_av') {
+                if (!tag) { window.showToast("Please tag a team member.", 'error'); return; }
+                const date = $('modalDateInput')?.value || '';
+                if (!date) { window.showToast("Please select a date.", 'error'); return; }
+                job.avOpenDate = date;
+                // Also update the Lever state to Done
+                job.levers.openToAVs = { done: true, user: tag, time: date };
+                pushLog('Opened to AVs', `Effective ${date}`, tag);
+                
+                // Save to database
+                recordChange(job.id, 'av_open_date_update', {
+                  avOpenDate: date
+                });
+                recordChange(job.id, 'lever_update', {
+                  leverKey: 'openToAVs',
+                  done: true,
+                  user: tag,
+                  time: date
+                });
+
+              } else if (s.modal.type === 'candidate_action') {
+                const actionType = $('candidateActionType')?.value || '';
+                if (!actionType) { window.showToast("Please select an action.", 'error'); return; }
+                if (!tag) { window.showToast("Please tag a team member.", 'error'); return; }
+
+                const cand = job.candidates[s.modal.candidateIndex];
+                if (!cand) { window.showToast("Candidate not found.", 'error'); return; }
+
+                if (actionType === 'confirm_interview') {
+                  const date = $('modalDateInput')?.value || '';
+                  if (!date) { window.showToast("Please enter interview date.", 'error'); return; }
+                  cand.interviewDate = date;
+                  pushLog('Interview', `Scheduled ${date} for ${cand.name}`, tag);
+                } else if (actionType === 'remove_candidate') {
+                  const reason = $('removeReasonInput')?.value || '';
+                  if (!reason) { window.showToast("Please select a reason.", 'error'); return; }
+                  cand.isDeclined = true;
+                  cand.declineReason = reason;
+                  pushLog('Removed', `${cand.name} moved to declined (${reason})`, tag);
+                }
+              }
+
+              const dataToSave = s.jobs.map(j => ({
+                id: j.id, levers: j.levers, margin: j.margin,
+                nextStep: j.nextStep, avOpenDate: j.avOpenDate, history: j.history
+              }));
+              // Data now saved via recordChange() function
+
+              View.rowUpdate(job.id);
+              this.dispatch('CLOSE_MODAL');
+              break;
+            }
+
+            case 'TOGGLE_LEVER_OFF': {
+              const j = s.jobs.find(x => x.id === payload.id);
+              if (!j || !j.levers?.[payload.key]) break;
+              j.levers[payload.key].done = false;
+              j.levers[payload.key].user = '';
+              j.levers[payload.key].time = '';
+
+              if (!j.history) j.history = [];
+              const logItem = { jobId: j.id, type: 'Undo', desc: `Reverted ${CONSTANTS.LEVER_LABELS[payload.key]}`, tag: null, time: new Date().toLocaleString() };
+              s.sessionLog.push(logItem);
+              j.history.push(logItem);
+              
+              // Save to database
+              recordChange(j.id, 'lever_update', {
+                leverKey: payload.key,
+                done: false,
+                user: '',
+                time: ''
+              });
+
+              View.rowUpdate(payload.id);
+              break;
+            }
+
+            case 'GENERATE_SUMMARY': {
+              const txt = $('summaryText');
+              if (!txt) break;
+
+              if (s.sessionLog.length === 0) txt.value = "No actions recorded this session.";
+              else {
+                const grouped = {};
+                s.sessionLog.forEach(item => {
+                  grouped[item.jobId] = grouped[item.jobId] || [];
+                  grouped[item.jobId].push(item);
+                });
+
+                let report = `GHR Impact Manager. Session Summary\nDate: ${new Date().toLocaleString()}\n----------------------------------------\n`;
+                Object.keys(grouped).forEach(id => {
+                  const job = s.jobs.find(j => j.id === id);
+                  report += `\nJob #${id}. ${job?.specialty || 'Unknown'}\n${job?.facility ? '(' + job.facility + ')' : ''}\n`;
+                  grouped[id].forEach(a => {
+                    let line = `  • ${a.type}`;
+                    if (a.desc) line += `: ${a.desc}`;
+                    if (a.tag) line += ` (@${a.tag})`;
+                    report += line + '\n';
+                  });
+                });
+
+                txt.value = report;
+              }
+
+              this.dispatch('OPEN_MODAL', { type: 'summary' });
+              break;
+            }
+
+            case 'GENERATE_HOT_JOBS_EMAIL': {
+              const hotJobs = View.getFilteredJobs(s).filter(j => j.levers && j.levers.hotJob && j.levers.hotJob.done);
+              if (hotJobs.length === 0) { window.showToast("No hot jobs selected.", 'error'); break; }
+
+              // Grouping Logic
+              const grouped = {};
+              hotJobs.forEach(j => {
+                  const sys = j.system || 'Other';
+                  const fac = j.facility || 'Unknown';
+                  if(!grouped[sys]) grouped[sys] = {};
+                  if(!grouped[sys][fac]) grouped[sys][fac] = [];
+                  grouped[sys][fac].push(j);
+              });
+
+              let body = `HOT JOBS UPDATE - ${new Date().toLocaleDateString()}\n`;
+              
+              Object.keys(grouped).sort().forEach(sys => {
+                  body += `\n========================================\n`;
+                  body += `🏛️ ${sys.toUpperCase()}\n`;
+                  body += `========================================\n`;
+                  
+                  Object.keys(grouped[sys]).sort().forEach(fac => {
+                      body += `\n📍 ${fac}\n`;
+                      
+                      grouped[sys][fac].forEach(j => {
+                          // Get active submissions for this job
+                          const activeSubs = j.candidates.filter(c => !c.isDeclined);
+                          
+                          const ghrSubs = [];
+                          const agencySubs = [];
+
+                          activeSubs.forEach(c => {
+                              const agLower = (c.agency || '').toLowerCase();
+                              const isInternal = agLower.includes('ghr') || agLower.includes('planet');
+                              const days = c.date ? Utils.calcDays(c.date) : '?';
+                              
+                              // Redaction: Only redact non-internal agencies if privacy mode is on
+                              let name = c.name;
+                              if (s.redactMode && !isInternal) {
+                                  name = Utils.redactName(c.name);
+                              }
+
+                              const entry = `${name} (${days}d)`;
+
+                              if (isInternal) {
+                                  ghrSubs.push(entry);
+                              } else {
+                                  agencySubs.push(entry);
+                              }
+                          });
+
+                          body += `   • ${j.specialty} (${j.shift} ${j.shiftTime || ''})\n`;
+                          body += `     Rate: ${j.billRate} | ID: ${j.id}\n`;
+                          if(j.nextStep?.text) body += `     Note: ${j.nextStep.text}\n`;
+                          
+                          if (ghrSubs.length > 0) {
+                              body += `     🟦 GHR Candidates: ${ghrSubs.join(', ')}\n`;
+                          }
+                          if (agencySubs.length > 0) {
+                              body += `     🏢 Agency Candidates: ${agencySubs.join(', ')}\n`;
+                          }
+                          body += `\n`;
+                      });
+                  });
+              });
+
+              const txt = $('summaryText');
+              if (txt) {
+                txt.value = body;
+                this.dispatch('OPEN_MODAL', { type: 'summary' });
+                if ($('modalTitle')) $('modalTitle').innerText = "Hot Jobs Email Draft";
+              }
+              break;
+            }
+
+            case 'ANALYZE_DECLINES': {
+              const job = s.jobs.find(x => x.id === payload.id);
+              if (!job) break;
+              const declined = job.candidates.filter(c => c.isDeclined);
+              
+              if (declined.length === 0) { 
+                  // Fallback if user clicks analyze but no data (should be guarded by UI but safe to keep)
+                  window.showToast("No declined candidates data found.", 'info'); 
+                  break; 
+              }
+              
+              const reasons = {};
+              declined.forEach(c => { 
+                  let r = (c.declineReason || "No Reason Provided").trim();
+                  // Normalize common variations
+                  if(r.toLowerCase().includes('rate')) r = "Bill Rate";
+                  if(r.toLowerCase().includes('filled')) r = "Position Filled";
+                  if(r.toLowerCase().includes('withdrew') || r.toLowerCase().includes('retract')) r = "Candidate Withdrew";
+                  reasons[r] = (reasons[r] || 0) + 1; 
+              });
+              
+              let report = `DECLINE ANALYSIS: Job #${job.id}\n`;
+              report += `Total Declines: ${declined.length}\n`;
+              report += `--------------------------------\n`;
+              
+              const sorted = Object.entries(reasons).sort((a,b) => b[1] - a[1]);
+              sorted.forEach(([r, count]) => {
+                  const pct = Math.round((count / declined.length) * 100);
+                  report += `[${count}] ${r} (${pct}%)\n`;
+              });
+
+              const txt = $('summaryText');
+              if(txt) {
+                  txt.value = report;
+                  this.dispatch('OPEN_MODAL', { type: 'summary', title: 'Decline Analysis' });
+              }
+              break;
+            }
+
+            default:
+              break;
+          }
+        } catch (e) {
+          console.error("Dispatch error:", action, payload, e);
+          window.showToast("A runtime error occurred. See console.", "error");
+        }
+      }
+    };
+
+    // ==========================
+    // 7. EVENT LISTENERS
+    // ==========================
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+
+      document.addEventListener('click', () => {
+        document.querySelectorAll('.multi-select-container').forEach(c => c.classList.remove('open'));
+      });
+
+      // File input handlers removed - app now loads from database
+      
+      $('modalCancelBtn')?.addEventListener('click', () => store.dispatch('CLOSE_MODAL'));
+      $('modalConfirmBtn')?.addEventListener('click', () => store.dispatch('CONFIRM_MODAL'));
+
+      View.kpis([]);
+      View.legend();
+      View.viewToggle();
+    });
+
+    window.View = View;
+    window.Utils = Utils;
+    
+    // ============================================================================
+    // HISTORY MODAL FUNCTIONS
+    // ============================================================================
+    
+    let currentHistoryVersion = null;
+    
+    window.openHistoryModal = async function() {
+        try {
+            document.getElementById('historyModal').classList.remove('hidden');
+            
+            // Load history versions
+            try {
+                const response = await fetch(DB_CONFIG.historyEndpoint);
+                if (response.ok) {
+                    historyVersions = await response.json();
+                }
+            } catch (error) {
+                console.warn('Could not load history from database:', error);
+                // Try localStorage in demo mode
+                const localHistory = localStorage.getItem('ghr_demo_history');
+                if (localHistory) {
+                    historyVersions = JSON.parse(localHistory);
+                } else {
+                    historyVersions = [];
+                }
+            }
+            
+            // Populate dropdown
+            const select = document.getElementById('historyVersionSelect');
+            select.innerHTML = '<option value="">Current State</option>' + 
+                historyVersions.map((v, idx) => {
+                    const date = new Date(v.timestamp);
+                    const dateStr = date.toLocaleString();
+                    return `<option value="${idx}">${dateStr} (${v.changeCount} changes)</option>`;
+                }).join('');
+            
+            // Show current state by default
+            document.getElementById('historyContent').innerHTML = `
+                <div class="text-center py-8 text-slate-500">
+                    <i data-lucide="clock" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                    <p class="text-lg font-medium">Select a version to view historical data</p>
+                    <p class="text-sm mt-2">${historyVersions.length} versions available</p>
+                </div>
+            `;
+            
+            lucide.createIcons();
+        } catch (error) {
+            console.error('Error opening history modal:', error);
+            window.showToast('Error loading history', 'error');
+        }
+    };
+    
+    window.closeHistoryModal = function() {
+        document.getElementById('historyModal').classList.add('hidden');
+        currentHistoryVersion = null;
+    };
+    
+    window.loadHistoricalVersion = function() {
+        const select = document.getElementById('historyVersionSelect');
+        const versionIdx = select.value;
+        
+        if (versionIdx === '') {
+            document.getElementById('historyContent').innerHTML = `
+                <div class="text-center py-8 text-slate-500">
+                    <i data-lucide="clock" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                    <p class="text-lg font-medium">Select a version to view historical data</p>
+                    <p class="text-sm mt-2">${historyVersions.length} versions available</p>
+                </div>
+            `;
+            lucide.createIcons();
+            return;
+        }
+        
+        currentHistoryVersion = historyVersions[versionIdx];
+        const historicalData = currentHistoryVersion.data;
+        
+        // Display the historical changes
+        const content = document.getElementById('historyContent');
+        content.innerHTML = `
+            <div class="mb-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                <div class="flex items-center gap-2 text-blue-800 font-bold mb-1">
+                    <i data-lucide="info" class="w-4 h-4"></i>
+                    Viewing Historical Version
+                </div>
+                <div class="text-sm text-blue-700">
+                    <strong>Timestamp:</strong> ${new Date(currentHistoryVersion.timestamp).toLocaleString()}<br>
+                    <strong>Total Changes:</strong> ${currentHistoryVersion.changeCount}
+                </div>
+            </div>
+            
+            <div class="space-y-2 max-h-[500px] overflow-y-auto">
+                ${historicalData.changes.length > 0 ? historicalData.changes.map(change => `
+                    <div class="border rounded p-3 bg-white hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <span class="font-bold text-sm text-slate-900">${change.jobId}</span>
+                                <span class="ml-2 text-xs px-2 py-1 rounded ${
+                                    change.type === 'lever_update' ? 'bg-indigo-100 text-indigo-700' :
+                                    change.type === 'margin_update' ? 'bg-green-100 text-green-700' :
+                                    change.type === 'next_step_update' ? 'bg-orange-100 text-orange-700' :
+                                    'bg-slate-100 text-slate-700'
+                                }">${change.type.replace('_', ' ')}</span>
+                            </div>
+                            <span class="text-xs text-slate-500">${new Date(change.timestamp).toLocaleString()}</span>
+                        </div>
+                        <div class="text-sm text-slate-600">
+                            ${formatChangeData(change)}
+                        </div>
+                        <div class="text-xs text-slate-400 mt-1">By: ${change.user}</div>
+                    </div>
+                `).join('') : '<div class="text-center py-8 text-slate-400">No changes in this version</div>'}
+            </div>
+        `;
+        
+        lucide.createIcons();
+    };
+    
+    function formatChangeData(change) {
+        switch (change.type) {
+            case 'lever_update':
+                const leverKey = change.data.leverKey;
+                const leverName = CONSTANTS.LEVER_LABELS[leverKey] || leverKey;
+                return `<strong>${leverName}</strong> - ${change.data.done ? 'Completed' : 'Undone'}${change.data.time ? ` on ${change.data.time}` : ''}`;
+            case 'margin_update':
+                return `Margin updated to: <strong>${change.data.margin}%</strong>`;
+            case 'next_step_update':
+                return `Next step: <em>"${change.data.nextStep?.text || 'N/A'}"</em>`;
+            case 'av_open_date_update':
+                return `AV Open Date: <strong>${change.data.avOpenDate}</strong>`;
+            case 'history_update':
+                return `History log updated`;
+            default:
+                return JSON.stringify(change.data);
+        }
+    }
+    
+    window.compareVersions = async function() {
+        const select = document.getElementById('historyVersionSelect');
+        const versionIdx = select.value;
+        
+        if (versionIdx === '') {
+            window.showToast('Please select a version to compare with current state', 'info');
+            return;
+        }
+        
+        const historicalVersion = historyVersions[versionIdx];
+        const historicalChanges = historicalVersion.data.changes;
+        const currentChanges = changeLog;
+        
+        // Find differences
+        const added = currentChanges.filter(c => !historicalChanges.find(h => h.id === c.id));
+        const removed = historicalChanges.filter(h => !currentChanges.find(c => c.id === h.id));
+        
+        const content = document.getElementById('historyContent');
+        content.innerHTML = `
+            <div class="mb-4 p-4 bg-purple-50 border-l-4 border-purple-500 rounded">
+                <div class="flex items-center gap-2 text-purple-800 font-bold mb-1">
+                    <i data-lucide="git-compare" class="w-4 h-4"></i>
+                    Comparing Versions
+                </div>
+                <div class="text-sm text-purple-700">
+                    <strong>Historical:</strong> ${new Date(historicalVersion.timestamp).toLocaleString()} (${historicalChanges.length} changes)<br>
+                    <strong>Current:</strong> ${new Date().toLocaleString()} (${currentChanges.length} changes)
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <h4 class="font-bold text-green-700 mb-2 flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        Added (${added.length})
+                    </h4>
+                    <div class="space-y-2 max-h-[450px] overflow-y-auto">
+                        ${added.length > 0 ? added.map(change => `
+                            <div class="border border-green-300 bg-green-50 rounded p-2 text-sm">
+                                <div class="font-bold">${change.jobId}</div>
+                                <div class="text-xs text-green-700">${formatChangeData(change)}</div>
+                            </div>
+                        `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No changes added</div>'}
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-bold text-red-700 mb-2 flex items-center gap-2">
+                        <i data-lucide="minus-circle" class="w-4 h-4"></i>
+                        Removed (${removed.length})
+                    </h4>
+                    <div class="space-y-auto max-h-[450px] overflow-y-auto">
+                        ${removed.length > 0 ? removed.map(change => `
+                            <div class="border border-red-300 bg-red-50 rounded p-2 text-sm">
+                                <div class="font-bold">${change.jobId}</div>
+                                <div class="text-xs text-red-700">${formatChangeData(change)}</div>
+                            </div>
+                        `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No changes removed</div>'}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        lucide.createIcons();
+    };
+    
+    window.restoreVersion = async function() {
+        if (!currentHistoryVersion) {
+            window.showToast('Please select a version to restore', 'info');
+            return;
+        }
+        
+        const confirmMsg = `Are you sure you want to restore to the version from ${new Date(currentHistoryVersion.timestamp).toLocaleString()}?\n\nThis will replace the current state with ${currentHistoryVersion.changeCount} changes.`;
+        
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+        
+        try {
+            // Restore the historical changes
+            changeLog = [...currentHistoryVersion.data.changes];
+            
+            // Save to localStorage in demo mode or database
+            try {
+                // Try to save to database
+                await fetch(DB_CONFIG.changesEndpoint, {
+                    method: 'DELETE'
+                });
+                
+                // Re-add all changes
+                for (const change of changeLog) {
+                    await fetch(DB_CONFIG.changesEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(change)
+                    });
+                }
+            } catch (error) {
+                // Fallback to localStorage
+                localStorage.setItem('ghr_demo_changes', JSON.stringify(changeLog));
+            }
+            
+            // Reload data to reflect restored state
+            await window.loadDataFromDatabase();
+            
+            window.showToast('Version restored successfully!', 'success');
+            closeHistoryModal();
+        } catch (error) {
+            console.error('Error restoring version:', error);
+            window.showToast('Error restoring version', 'error');
+        }
+    };
+  </script>
+</body>
+</html>
