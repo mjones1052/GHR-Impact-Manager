@@ -3026,6 +3026,9 @@
                 }
             }
             
+            // Sort by timestamp descending (most recent first)
+            historyVersions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
             // Populate dropdown
             const select = document.getElementById('historyVersionSelect');
             select.innerHTML = '<option value="">Current State</option>' + 
@@ -3144,12 +3147,16 @@
         }
         
         const historicalVersion = historyVersions[versionIdx];
-        const historicalChanges = historicalVersion.data.changes;
-        const currentChanges = changeLog;
+        const historicalChanges = historicalVersion.data.changes || [];
+        const currentChanges = changeLog || [];
         
-        // Find differences
+        // Find differences by ID
         const added = currentChanges.filter(c => !historicalChanges.find(h => h.id === c.id));
         const removed = historicalChanges.filter(h => !currentChanges.find(c => c.id === h.id));
+        
+        // Calculate net change count
+        const netChange = currentChanges.length - historicalChanges.length;
+        const netChangeText = netChange > 0 ? `+${netChange}` : netChange.toString();
         
         const content = document.getElementById('historyContent');
         content.innerHTML = `
@@ -3160,36 +3167,48 @@
                 </div>
                 <div class="text-sm text-purple-700">
                     <strong>Historical:</strong> ${Utils.formatTimestamp(historicalVersion.timestamp)} (${historicalChanges.length} changes)<br>
-                    <strong>Current:</strong> ${Utils.formatTimestamp(new Date())} (${currentChanges.length} changes)
+                    <strong>Current:</strong> ${Utils.formatTimestamp(new Date())} (${currentChanges.length} changes)<br>
+                    <strong>Net Change:</strong> <span class="${netChange >= 0 ? 'text-green-600' : 'text-red-600'}">${netChangeText} changes</span>
                 </div>
+            </div>
+            
+            <div class="mb-4 p-3 bg-slate-100 rounded text-xs text-slate-600">
+                <strong>Note:</strong> "Added" shows new changes since the selected version. "Removed" shows changes that existed in the historical version but are no longer in the current log (typically only happens after a restore operation). Undoing a lever creates a new "Undo" change rather than removing the original.
             </div>
             
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <h4 class="font-bold text-green-700 mb-2 flex items-center gap-2">
                         <i data-lucide="plus-circle" class="w-4 h-4"></i>
-                        Added (${added.length})
+                        Added Since Then (${added.length})
                     </h4>
-                    <div class="space-y-2 max-h-[450px] overflow-y-auto">
+                    <div class="space-y-2 max-h-[400px] overflow-y-auto">
                         ${added.length > 0 ? added.map(change => `
                             <div class="border border-green-300 bg-green-50 rounded p-2 text-sm">
-                                <div class="font-bold">${change.jobId}</div>
+                                <div class="flex justify-between">
+                                    <span class="font-bold">${change.jobId}</span>
+                                    <span class="text-xs text-slate-500">${Utils.formatTimestamp(change.timestamp)}</span>
+                                </div>
                                 <div class="text-xs text-green-700">${formatChangeData(change)}</div>
+                                <div class="text-xs text-slate-400">By: ${change.user}</div>
                             </div>
-                        `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No changes added</div>'}
+                        `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No new changes since this version</div>'}
                     </div>
                 </div>
-                
                 <div>
                     <h4 class="font-bold text-red-700 mb-2 flex items-center gap-2">
                         <i data-lucide="minus-circle" class="w-4 h-4"></i>
                         Removed (${removed.length})
                     </h4>
-                    <div class="space-y-auto max-h-[450px] overflow-y-auto">
+                    <div class="space-y-2 max-h-[400px] overflow-y-auto">
                         ${removed.length > 0 ? removed.map(change => `
                             <div class="border border-red-300 bg-red-50 rounded p-2 text-sm">
-                                <div class="font-bold">${change.jobId}</div>
+                                <div class="flex justify-between">
+                                    <span class="font-bold">${change.jobId}</span>
+                                    <span class="text-xs text-slate-500">${Utils.formatTimestamp(change.timestamp)}</span>
+                                </div>
                                 <div class="text-xs text-red-700">${formatChangeData(change)}</div>
+                                <div class="text-xs text-slate-400">By: ${change.user}</div>
                             </div>
                         `).join('') : '<div class="text-center py-4 text-slate-400 text-sm">No changes removed</div>'}
                     </div>
