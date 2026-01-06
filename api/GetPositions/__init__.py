@@ -18,7 +18,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # Get all open orders
         cursor.execute('''
             SELECT 
-                Contract_ID as position_id,
+                RTRIM(LTRIM(Contract_ID)) as position_id,
                 Req_ID as req_id,
                 Program as program,
                 Facility as facility,
@@ -60,7 +60,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             placeholders = ','.join(['?' for _ in position_ids])
             cursor.execute(f'''
                 SELECT 
-                    Contract_Assignment_ID as position_id,
+                    RTRIM(LTRIM(Contract_Assignment_ID)) as position_id,
                     Agency_Name as agency,
                     Professional as name,
                     Submission_Date as submitDate,
