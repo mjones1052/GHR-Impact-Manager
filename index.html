@@ -212,8 +212,8 @@
   <div id="kpiContainer" class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6 shrink-0 min-h-[100px]"></div>
 
   <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 shrink-0">
-    <div id="legendContainer" class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 bg-white p-3 rounded-md border border-slate-200 inline-flex shadow-sm min-h-[38px]"></div>
-    <div class="flex items-center gap-3">
+    <div id="legendContainer" class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 bg-white p-3 rounded-md border border-slate-200 inline-flex shadow-sm min-h-[38px] flex-1"></div>
+    <div class="flex items-center gap-3 shrink-0">
       <div class="flex bg-white border border-slate-200 rounded-lg p-1 shadow-sm" id="viewToggles">
         <button onclick="store.dispatch('SET_VIEW','list')" id="btnViewList"
                 class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors bg-blue-50 text-blue-700 shadow-sm border border-blue-100">List View</button>
@@ -1664,9 +1664,12 @@
 
         const activeClass = "px-4 py-1.5 text-xs font-bold rounded-md transition-colors bg-blue-50 text-blue-700 shadow-sm border border-blue-100";
         const inactiveClass = "px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700";
+        // Hot Jobs button needs flex for the flame icon
+        const activeHotClass = "px-4 py-1.5 text-xs font-bold rounded-md transition-colors bg-blue-50 text-blue-700 shadow-sm border border-blue-100 flex items-center gap-1";
+        const inactiveHotClass = "px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700 flex items-center gap-1";
 
         if (btnList) btnList.className = view === 'list' ? activeClass : inactiveClass;
-        if (btnHot) btnHot.className = view === 'hotjobs' ? activeClass : "px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700 flex items-center gap-1";
+        if (btnHot) btnHot.className = view === 'hotjobs' ? activeHotClass : inactiveHotClass;
         if (btnStats) btnStats.className = view === 'stats' ? activeClass : inactiveClass;
       },
 
