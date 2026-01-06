@@ -5,6 +5,7 @@ import json
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
+        # Connect to positions database
         conn = pyodbc.connect(
             f"DRIVER={{ODBC Driver 18 for SQL Server}};"
             f"SERVER={os.environ['DB_HOST']};"
@@ -15,143 +16,153 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         cursor = conn.cursor()
         
-        # Get all open orders
+        # Get open positions with all needed fields
         cursor.execute('''
             SELECT 
-                RTRIM(LTRIM(Contract_ID)) as position_id,
-                Req_ID as req_id,
-                Program as program,
-                Facility as facility,
-                Position_Type as specialty,
-                Order_Date_Created as date_added,
-                Unit as unit,
-                Awarded_Rate as bill_rate,
-                Start_Time as shift_time,
-                Hiring_Manager as hiring_manager,
-                Contract_Status as status
+                RTRIM(LTRIM(Contract_ID)) AS position_id,
+                Req_ID AS req_id,
+                Program AS program,
+                Facility AS facility,
+                Position_Type AS specialty,
+                Order_Date_Created AS date_added,
+                Unit AS unit,
+                Awarded_Rate AS bill_rate,
+                Time_Type AS time_type,
+                Start_Time AS start_time,
+                End_Time AS end_time,
+                Hiring_Manager AS hiring_manager,
+                Contract_Status AS status
             FROM dhc.B4HealthOrder
             WHERE Contract_Status = 'Open'
             ORDER BY Order_Date_Created DESC
         ''')
         
         columns = [column[0] for column in cursor.description]
-        positions = {}
+        positions = []
+        position_ids = []
         
         for row in cursor.fetchall():
             row_dict = dict(zip(columns, row))
-            position_id = str(row_dict['position_id'])
             
             # Convert dates to ISO format
             if row_dict.get('date_added'):
-                row_dict['date_added'] = row_dict['date_added'].isoformat()
+                row_dict['date_added'] = row_dict['date_added'].isoformat() if hasattr(row_dict['date_added'], 'isoformat') else str(row_dict['date_added'])
             
-            # Initialize candidates array
-            row_dict['candidates'] = []
+            # Convert time fields to strings
+            if row_dict.get('start_time'):
+                row_dict['start_time'] = str(row_dict['start_time'])
+            if row_dict.get('end_time'):
+                row_dict['end_time'] = str(row_dict['end_time'])
+            
+            # Initialize submission counts
             row_dict['ghrSubs'] = 0
             row_dict['avSubs'] = 0
             row_dict['ghrDeclines'] = 0
             row_dict['avDeclines'] = 0
+            row_dict['candidates'] = []
             
-            positions[position_id] = row_dict
+            positions.append(row_dict)
+            if row_dict.get('position_id'):
+                position_ids.append(row_dict['position_id'])
         
-        # Get all submissions for these positions
-        position_ids = list(positions.keys())
+        # Get submissions for these positions
         if position_ids:
             placeholders = ','.join(['?' for _ in position_ids])
             cursor.execute(f'''
                 SELECT 
-                    RTRIM(LTRIM(Contract_Assignment_ID)) as position_id,
-                    Agency_Name as agency,
-                    Professional as name,
-                    Submission_Date as submitDate,
-                    Agency_Retracted_Date as agencyRetractedDate,
-                    Hospital_Decline_Date as hospDeclineDate,
-                    Hospital_Decline_Reason as hospDeclineReason,
-                    Offer_Date as offerDate,
-                    Agency_Decline_Date as agencyDeclineDate,
-                    Offer_Decline_Reason as offerDeclineReason,
-                    Date_Awarded as awardedDate,
-                    RTO as rto,
-                    IsActive as isActive
+                    RTRIM(LTRIM(Contract_Assignment_ID)) AS Contract_Assignment_ID,
+                    Agency_Name,
+                    Professional,
+                    Submission_Date,
+                    Agency_Retracted_Date,
+                    Hospital_Decline_Date,
+                    Hospital_Decline_Reason,
+                    Offer_Date,
+                    Agency_Decline_Date,
+                    Offer_Decline_Reason,
+                    Date_Awarded,
+                    RTO,
+                    IsActive
                 FROM dhc.B4Health_Contract_Submissions
-                WHERE Contract_Assignment_ID IN ({placeholders})
+                WHERE RTRIM(LTRIM(Contract_Assignment_ID)) IN ({placeholders})
             ''', position_ids)
             
             sub_columns = [column[0] for column in cursor.description]
             
+            # Create lookup dict for positions
+            pos_lookup = {p['position_id']: p for p in positions}
+            
             for row in cursor.fetchall():
                 sub = dict(zip(sub_columns, row))
-                position_id = str(sub['position_id'])
+                pos_id = sub.get('Contract_Assignment_ID')
                 
-                if position_id not in positions:
-                    continue
-                
-                # Convert dates to ISO format
-                for date_field in ['submitDate', 'agencyRetractedDate', 'hospDeclineDate', 
-                                   'offerDate', 'agencyDeclineDate', 'awardedDate']:
-                    if sub.get(date_field):
-                        sub[date_field] = sub[date_field].isoformat()
-                
-                # Determine if declined
-                is_declined = (
-                    sub.get('hospDeclineDate') is not None or
-                    sub.get('agencyDeclineDate') is not None or
-                    sub.get('agencyRetractedDate') is not None
-                )
-                
-                # Determine decline reason
-                decline_reason = None
-                if sub.get('hospDeclineDate'):
-                    decline_reason = sub.get('hospDeclineReason') or 'Hospital Declined'
-                elif sub.get('agencyDeclineDate'):
-                    decline_reason = sub.get('offerDeclineReason') or 'Agency Declined'
-                elif sub.get('agencyRetractedDate'):
-                    decline_reason = 'Agency Retracted'
-                
-                # Check if GHR or Agency Vendor
-                agency_name = str(sub.get('agency') or '').lower()
-                is_ghr = 'ghr' in agency_name or 'planet' in agency_name
-                
-                candidate = {
-                    'name': sub.get('name') or 'Unknown',
-                    'agency': sub.get('agency') or 'Unknown',
-                    'submitDate': sub.get('submitDate'),
-                    'offerDate': sub.get('offerDate'),
-                    'awardedDate': sub.get('awardedDate'),
-                    'rto': sub.get('rto'),
-                    'isDeclined': is_declined,
-                    'declineReason': decline_reason,
-                    'hospDeclineDate': sub.get('hospDeclineDate'),
-                    'agencyDeclineDate': sub.get('agencyDeclineDate'),
-                    'agencyRetractedDate': sub.get('agencyRetractedDate'),
-                    'isGHR': is_ghr,
-                    'isActive': bool(sub.get('isActive'))
-                }
-                
-                positions[position_id]['candidates'].append(candidate)
-                
-                # Update counts
-                if is_declined:
-                    if is_ghr:
-                        positions[position_id]['ghrDeclines'] += 1
+                if pos_id and pos_id in pos_lookup:
+                    position = pos_lookup[pos_id]
+                    
+                    # Determine if declined
+                    is_declined = bool(
+                        sub.get('Hospital_Decline_Date') or 
+                        sub.get('Agency_Decline_Date') or 
+                        sub.get('Agency_Retracted_Date')
+                    )
+                    
+                    # Determine decline reason
+                    decline_reason = None
+                    if sub.get('Hospital_Decline_Date'):
+                        decline_reason = sub.get('Hospital_Decline_Reason') or 'Hospital Declined'
+                    elif sub.get('Agency_Decline_Date'):
+                        decline_reason = sub.get('Offer_Decline_Reason') or 'Agency Declined'
+                    elif sub.get('Agency_Retracted_Date'):
+                        decline_reason = 'Agency Retracted'
+                    
+                    # Determine if GHR
+                    agency = str(sub.get('Agency_Name') or '').lower()
+                    is_ghr = 'ghr' in agency or 'planet' in agency
+                    
+                    # Build candidate object
+                    candidate = {
+                        'name': sub.get('Professional') or 'Unknown',
+                        'agency': sub.get('Agency_Name') or 'Unknown',
+                        'submitDate': sub.get('Submission_Date').isoformat() if sub.get('Submission_Date') and hasattr(sub.get('Submission_Date'), 'isoformat') else None,
+                        'offerDate': sub.get('Offer_Date').isoformat() if sub.get('Offer_Date') and hasattr(sub.get('Offer_Date'), 'isoformat') else None,
+                        'awardedDate': sub.get('Date_Awarded').isoformat() if sub.get('Date_Awarded') and hasattr(sub.get('Date_Awarded'), 'isoformat') else None,
+                        'rto': sub.get('RTO'),
+                        'isDeclined': is_declined,
+                        'declineReason': decline_reason,
+                        'hospDeclineDate': sub.get('Hospital_Decline_Date').isoformat() if sub.get('Hospital_Decline_Date') and hasattr(sub.get('Hospital_Decline_Date'), 'isoformat') else None,
+                        'agencyDeclineDate': sub.get('Agency_Decline_Date').isoformat() if sub.get('Agency_Decline_Date') and hasattr(sub.get('Agency_Decline_Date'), 'isoformat') else None,
+                        'agencyRetractedDate': sub.get('Agency_Retracted_Date').isoformat() if sub.get('Agency_Retracted_Date') and hasattr(sub.get('Agency_Retracted_Date'), 'isoformat') else None,
+                        'isGHR': is_ghr,
+                        'isActive': sub.get('IsActive') or False
+                    }
+                    
+                    position['candidates'].append(candidate)
+                    
+                    # Update counts
+                    if is_declined:
+                        if is_ghr:
+                            position['ghrDeclines'] += 1
+                        else:
+                            position['avDeclines'] += 1
                     else:
-                        positions[position_id]['avDeclines'] += 1
-                else:
-                    if is_ghr:
-                        positions[position_id]['ghrSubs'] += 1
-                    else:
-                        positions[position_id]['avSubs'] += 1
+                        if is_ghr:
+                            position['ghrSubs'] += 1
+                        else:
+                            position['avSubs'] += 1
         
         conn.close()
         
-        data = list(positions.values())
+        print(f"Returning {len(positions)} positions")
         
         return func.HttpResponse(
-            json.dumps(data, default=str),
+            json.dumps(positions, default=str),
             mimetype="application/json",
             status_code=200
         )
     except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
         return func.HttpResponse(
             json.dumps({'error': str(e)}),
             mimetype="application/json",

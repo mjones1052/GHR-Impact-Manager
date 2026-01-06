@@ -19,7 +19,7 @@
 │  When user makes changes:                            │
 │  6. Change is recorded to changeLog array            │
 │  7. Change is automatically saved to server          │
-│  8. Server writes to ghr-changes.json file           │
+│  8. Server writes to ghr-changes table           │
 │  9. UI is updated immediately                        │
 │  10. All users see changes on next refresh           │
 │                                                       │

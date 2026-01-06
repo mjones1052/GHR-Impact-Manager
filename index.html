@@ -742,6 +742,48 @@
     }
     
     /**
+     * Calculate shift length from start and end times - returns decimal hours like 8.5
+     */
+    function calculateShiftLength(startTime, endTime) {
+        if (!startTime || !endTime) return '';
+        
+        try {
+            // Parse times - handle various formats like "7:00 AM", "07:00", "19:00", etc.
+            const parseTime = (timeStr) => {
+                const str = String(timeStr).trim().toUpperCase();
+                let hours = 0, minutes = 0;
+                
+                // Try to match "HH:MM AM/PM" or "HH:MM" formats
+                const match12 = str.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/);
+                if (match12) {
+                    hours = parseInt(match12[1], 10);
+                    minutes = parseInt(match12[2] || '0', 10);
+                    const period = match12[3];
+                    
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                }
+                
+                return hours * 60 + minutes; // Return total minutes
+            };
+            
+            const startMinutes = parseTime(startTime);
+            const endMinutes = parseTime(endTime);
+            
+            // Calculate difference (handle overnight shifts)
+            let diffMinutes = endMinutes - startMinutes;
+            if (diffMinutes <= 0) diffMinutes += 24 * 60; // Add 24 hours for overnight
+            
+            // Return decimal hours (e.g., 8.5 for 8 hours 30 minutes)
+            const decimalHours = diffMinutes / 60;
+            // Round to 1 decimal place, but show whole number if no fraction
+            return decimalHours % 1 === 0 ? decimalHours.toString() : decimalHours.toFixed(1);
+        } catch (e) {
+            return '';
+        }
+    }
+    
+    /**
      * Process raw position data and apply changes
      */
     async function processPositionData(rawPositions) {
@@ -760,8 +802,10 @@
                 dateAdded: Utils.toDateOrNull(row.date_added || row.created_date),
                 daysPast: 0,
                 billRate: cleanBillRate(row.bill_rate || ''),
-                shift: String(row.shift_hours || row.shift || 'N/A'),
-                shiftTime: String(row.shift_time || ''),
+                shift: String(row.time_type || row.shift_hours || row.shift || 'N/A'),
+                shiftTime: row.start_time && row.end_time ? calculateShiftLength(row.start_time, row.end_time) : String(row.shift_time || ''),
+                startTime: String(row.start_time || ''),
+                endTime: String(row.end_time || ''),
                 hiringManager: String(row.hiring_manager || row.manager || 'Unknown'),
                 status: String(row.status || row.notes || 'No updates'),
                 margin: row.margin || defaultMargin,
@@ -1893,10 +1937,10 @@
                                 
                                 <!-- Shift & Unit -->
                                 <div class="w-40 shrink-0 grid grid-cols-1 gap-1">
-                                     <div class="font-medium text-slate-700 truncate flex items-center gap-1.5" title="${job.shift} ${job.shiftTime || ''}">
-                                         ${icon} ${job.shift} ${job.shiftTime || ''}
+                                     <div class="font-medium text-slate-700 truncate flex items-center gap-1.5" title="${job.shift || ''}">
+                                         ${icon} ${job.shiftTime || ''}${job.startTime && job.endTime ? ` ${job.startTime}-${job.endTime}` : ''}
                                      </div>
-                                     <div class="truncate text-slate-500" title="${job.unit || 'No Unit'}">${job.unit || ''}</div>
+                                     <div class="truncate text-slate-500">${job.id}</div>
                                 </div>
 
                                 <!-- Key Metrics (Age, Subs, Decs, Impact) -->
@@ -2016,8 +2060,8 @@
             <div class="col-span-3 pr-4 pl-2">
               <div class="text-[10px] uppercase font-bold text-slate-400">${job.system}</div>
               <div class="font-bold text-sm truncate">${job.facility}</div>
-              <div class="text-xs text-slate-500 truncate" title="${job.shift} ${job.shiftTime ? `(${job.shiftTime})` : ''}">
-                ${abbrSpecialty}${showUnit ? ` • ${job.unit}` : ''}${job.shiftTime ? ` • ${job.shiftTime}` : ''}
+              <div class="text-xs text-slate-500 truncate" title="${job.shiftTime ? `${job.shiftTime} hours` : ''}">
+                ${abbrSpecialty}${showUnit ? ` • ${job.unit}` : ''}${job.shift && job.shift !== 'N/A' ? ` • ${job.shift}` : ''}${job.startTime && job.endTime ? ` (${job.startTime} - ${job.endTime})` : ''}
               </div>
             </div>
             <div class="col-span-1 text-center font-bold text-slate-700 text-xs">${job.billRate}</div>
