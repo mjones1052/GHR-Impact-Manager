@@ -8,7 +8,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         snapshot = req.get_json()
         
         conn = pyodbc.connect(
-            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"DRIVER={{ODBC Driver 18 for SQL Server}};"
             f"SERVER={os.environ['DB_HOST']};"
             f"DATABASE={os.environ['CHANGES_DB']};"
             f"UID={os.environ['DB_USER']};"

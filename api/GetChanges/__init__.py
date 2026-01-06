@@ -6,7 +6,7 @@ import json
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         conn = pyodbc.connect(
-            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"DRIVER={{ODBC Driver 18 for SQL Server}};"
             f"SERVER={os.environ['DB_HOST']};"
             f"DATABASE={os.environ['CHANGES_DB']};"
             f"UID={os.environ['DB_USER']};"
