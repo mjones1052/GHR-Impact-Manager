@@ -19,7 +19,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         # Insert new snapshot
         cursor.execute('''
-            INSERT INTO ghr_history_snapshots (timestamp, changeCount, snapshot_data)
+            INSERT INTO dbo.ghr_history_snapshots (snapshot_timestamp, change_count, snapshot_data)
             VALUES (?, ?, ?)
         ''', (
             snapshot['timestamp'],
@@ -29,11 +29,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         # Keep only last 100 snapshots
         cursor.execute('''
-            DELETE FROM ghr_history_snapshots
+            DELETE FROM dbo.ghr_history_snapshots
             WHERE id NOT IN (
                 SELECT TOP 100 id
-                FROM ghr_history_snapshots
-                ORDER BY timestamp DESC
+                FROM dbo.ghr_history_snapshots
+                ORDER BY snapshot_timestamp DESC
             )
         ''')
         

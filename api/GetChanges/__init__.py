@@ -15,8 +15,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT id, timestamp, jobId, type, data, user_name
-            FROM ghr_changes
+            SELECT id, timestamp, jobid, change_type, change_data, user_name
+            FROM dbo.ghr_changes
             ORDER BY timestamp ASC
         ''')
         

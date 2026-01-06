@@ -17,7 +17,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO ghr_changes (id, timestamp, jobId, type, data, user_name)
+            INSERT INTO dbo.ghr_changes (id, timestamp, jobid, change_type, change_data, user_name)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             change['id'],

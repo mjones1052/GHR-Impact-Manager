@@ -15,9 +15,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT TOP 100 id, timestamp, changeCount, snapshot_data
-            FROM ghr_history_snapshots
-            ORDER BY timestamp DESC
+            SELECT TOP 100 id, snapshot_timestamp, change_count, snapshot_data
+            FROM dbo.ghr_history_snapshots
+            ORDER BY snapshot_timestamp DESC
         ''')
         
         snapshots = []
