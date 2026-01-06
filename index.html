@@ -410,6 +410,9 @@
     
     // Allow user to change their name via console: setCurrentUser('New Name')
     window.setCurrentUser = setCurrentUser;
+    
+    // Default margin from environment variable (loaded from API)
+    let defaultMargin = 25; // Fallback default
 
 
 
@@ -594,6 +597,20 @@
             let rawPositions;
             let usingTestData = false;
             
+            // Fetch config (default margin) from API
+            try {
+                const configResponse = await fetch(`${API_BASE_URL}/get-config`);
+                if (configResponse.ok) {
+                    const config = await configResponse.json();
+                    if (config.defaultMargin !== undefined) {
+                        defaultMargin = parseFloat(config.defaultMargin);
+                        console.log('Loaded default margin from config:', defaultMargin);
+                    }
+                }
+            } catch (configError) {
+                console.warn('Could not load config, using default margin:', defaultMargin);
+            }
+            
             // Try to fetch from database first
             try {
                 const positionsResponse = await fetch(DB_CONFIG.apiEndpoint);
@@ -747,7 +764,8 @@
                 shiftTime: String(row.shift_time || ''),
                 hiringManager: String(row.hiring_manager || row.manager || 'Unknown'),
                 status: String(row.status || row.notes || 'No updates'),
-                margin: row.margin || null,
+                margin: row.margin || defaultMargin,
+                marginOverridden: false,  // Track if margin was manually set
                 ghrSubs: row.ghrSubs || 0,
                 avSubs: row.avSubs || 0,
                 ghrDeclines: row.ghrDeclines || 0,
@@ -848,6 +866,7 @@
                     break;
                 case 'margin_update':
                     job.margin = change.data.margin;
+                    job.marginOverridden = true;  // Mark as manually set
                     break;
                 case 'next_step_update':
                     job.nextStep = change.data.nextStep;
