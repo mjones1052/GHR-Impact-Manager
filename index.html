@@ -2935,6 +2935,9 @@
       View.kpis([]);
       View.legend();
       View.viewToggle();
+      
+      // Auto-load data from database on page load
+      window.loadDataFromDatabase();
     });
 
     window.View = View;
