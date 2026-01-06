@@ -47,7 +47,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 Facility AS facility,
                 Position_Type AS specialty,
                 Start_Date AS startDate
-            FROM B4HealthOrder
+            FROM dhc.B4HealthOrder
             WHERE Start_Date > GETDATE()
               AND Start_Date <= DATEADD(month, 3, GETDATE())
               AND Contract_Status IN ('Active', 'Awarded', 'Pending')
