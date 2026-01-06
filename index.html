@@ -671,18 +671,22 @@
                 if (statsResponse.ok) {
                     const statsData = await statsResponse.json();
                     
-                    // Convert date strings to Date objects for onAssignment
+                    // Convert date strings to Date objects and normalize field names for onAssignment
                     if (statsData.onAssignment) {
                         statsData.onAssignment.forEach(r => {
                             r.startDate = r.startDate ? new Date(r.startDate) : null;
                             r.endDate = r.endDate ? new Date(r.endDate) : null;
+                            // Normalize Agency field name (API returns 'Agency', code expects 'agency')
+                            if (r.Agency && !r.agency) r.agency = r.Agency;
                         });
                     }
                     
-                    // Convert date strings to Date objects for upcoming
+                    // Convert date strings to Date objects and normalize for upcoming
                     if (statsData.upcoming) {
                         statsData.upcoming.forEach(r => {
                             r.startDate = r.startDate ? new Date(r.startDate) : null;
+                            // Normalize Agency field name
+                            if (r.Agency && !r.agency) r.agency = r.Agency;
                         });
                     }
                     
@@ -2181,7 +2185,13 @@
         });
 
         const activeCount = activeContractsFiltered.length;
-        const fillRate = (activeCount + total) > 0 ? Math.round((activeCount / (activeCount + total)) * 100) : 0;
+        
+        // Calculate GHR fill rate (GHR agencies / total active)
+        const ghrActive = activeContractsFiltered.filter(r => {
+          const agencyLower = (r.agency || '').toLowerCase();
+          return agencyLower.includes('ghr') || agencyLower.includes('planet');
+        }).length;
+        const fillRate = activeCount > 0 ? Math.round((ghrActive / activeCount) * 100) : 0;
 
         if (!total) {
           container.innerHTML = `
