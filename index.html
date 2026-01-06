@@ -2233,7 +2233,7 @@
           <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
             <div class="flex justify-between items-start mb-2">
               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${c.label}</span>
-              <i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500 cursor-help" title="${c.tooltip}"></i>
+              <span class="cursor-help" title="${c.tooltip}"><i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i></span>
             </div>
             <div class="text-2xl font-bold text-slate-800">${c.val}</div>
           </div>
@@ -2489,10 +2489,10 @@
               s.view = payload;
               View.viewToggle();
               View.main();
-              // Hide legend on stats tab, show on other tabs
+              // Hide legend on stats tab, show on other tabs (use visibility to preserve layout)
               const legendEl = $('legendContainer');
               if (legendEl) {
-                legendEl.style.display = payload === 'stats' ? 'none' : 'inline-flex';
+                legendEl.style.visibility = payload === 'stats' ? 'hidden' : 'visible';
               }
               break;
             }
