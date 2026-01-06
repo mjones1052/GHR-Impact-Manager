@@ -73,7 +73,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     Date_Awarded as awardedDate,
                     RTO as rto,
                     IsActive as isActive
-                FROM dhc.BHHealth_Contract_Submissions
+                FROM dhc.B4Health_Contract_Submissions
                 WHERE Contract_Assignment_ID IN ({placeholders})
             ''', position_ids)
             
