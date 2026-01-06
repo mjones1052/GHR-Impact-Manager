@@ -24,7 +24,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 Position_Type AS specialty,
                 Start_Date AS startDate,
                 End_Date AS endDate
-            FROM B4HealthOrder
+            FROM dhc.B4HealthOrder
             WHERE GETDATE() BETWEEN Start_Date AND End_Date
               AND Contract_Status = 'Active'
             ORDER BY Start_Date DESC

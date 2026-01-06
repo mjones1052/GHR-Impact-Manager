@@ -27,7 +27,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 Start_Time as shift_time,
                 Hiring_Manager as hiring_manager,
                 Contract_Status as status
-            FROM B4HealthOrder
+            FROM dhc.B4HealthOrder
             WHERE Contract_Status = 'Open'
             ORDER BY Order_Date_Created DESC
         ''')
