@@ -2221,19 +2221,19 @@
         const avPct = totalSubs ? Math.round((av / totalSubs) * 100) : 0;
 
         const cards = [
-          { label: 'Avg Days Open', val: avgDays, icon: 'clock', color: 'purple' },
-          { label: 'Submission Pending', val: `${avgPending} Days`, icon: 'hourglass', color: 'orange' },
-          { label: 'Active Sub Mix', val: `${ghrPct}% / ${avPct}%`, icon: 'users', color: 'blue' },
-          { label: 'Avg Margin', val: avgMargin + '%', icon: 'trending-up', color: 'green' },
-          { label: 'Total Jobs', val: `${total} / <span class="text-red-500">${critical}</span>`, icon: 'alert-triangle', color: 'red' },
-          { label: 'Fill Rate / Active', val: `${fillRate}% / ${activeCount}`, icon: 'check-circle', color: 'emerald' }
+          { label: 'Avg Days Open', val: avgDays, icon: 'clock', color: 'purple', tooltip: 'Average number of days positions have been open' },
+          { label: 'Submission Pending', val: `${avgPending} Days`, icon: 'hourglass', color: 'orange', tooltip: 'Average days submissions have been pending review' },
+          { label: 'Active Sub Mix', val: `${ghrPct}% / ${avPct}%`, icon: 'users', color: 'blue', tooltip: 'GHR submissions % / Agency Vendor submissions %' },
+          { label: 'Avg Margin', val: avgMargin + '%', icon: 'trending-up', color: 'green', tooltip: 'Average margin percentage across all open positions' },
+          { label: 'Total Jobs', val: `${total} / <span class="text-red-500">${critical}</span>`, icon: 'alert-triangle', color: 'red', tooltip: 'Total open positions / Critical (aging) positions' },
+          { label: 'Fill Rate / Active', val: `${fillRate}% / ${activeCount}`, icon: 'check-circle', color: 'emerald', tooltip: 'GHR fill rate % / Total active assignments on contract' }
         ];
 
         container.innerHTML = cards.map(c => `
           <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
             <div class="flex justify-between items-start mb-2">
               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${c.label}</span>
-              <i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i>
+              <i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500 cursor-help" title="${c.tooltip}"></i>
             </div>
             <div class="text-2xl font-bold text-slate-800">${c.val}</div>
           </div>
@@ -2489,6 +2489,11 @@
               s.view = payload;
               View.viewToggle();
               View.main();
+              // Hide legend on stats tab, show on other tabs
+              const legendEl = $('legendContainer');
+              if (legendEl) {
+                legendEl.style.display = payload === 'stats' ? 'none' : 'inline-flex';
+              }
               break;
             }
 
@@ -2517,15 +2522,20 @@
               job.levers.hotJob.done = !current;
 
               if (!current) {
-                job.levers.hotJob.user = "List Toggle";
+                job.levers.hotJob.user = getCurrentUser();
                 job.levers.hotJob.time = new Date().toLocaleDateString();
+              } else {
+                job.levers.hotJob.user = '';
+                job.levers.hotJob.time = '';
               }
 
-              const dataToSave = s.jobs.map(j2 => ({
-                id: j2.id, levers: j2.levers, margin: j2.margin,
-                nextStep: j2.nextStep, avOpenDate: j2.avOpenDate, history: j2.history
-              }));
-              // Data now saved via recordChange() function
+              // Save to database
+              recordChange(job.id, 'lever_update', {
+                leverKey: 'hotJob',
+                done: job.levers.hotJob.done,
+                user: job.levers.hotJob.user,
+                time: job.levers.hotJob.time
+              });
 
               if (s.view === 'hotjobs') View.hotJobs();
               else View.rowUpdate(id);
@@ -2695,8 +2705,8 @@
               } else if (s.modal.type === 'next_step') {
                 const text = $('nextStepText')?.value?.trim() || '';
                 if (text) {
-                  job.nextStep = { text, date: new Date().toLocaleDateString(), user: 'Session User' };
-                  pushLog('Next Step', text, null);
+                  job.nextStep = { text, date: new Date().toLocaleDateString(), user: getCurrentUser() };
+                  pushLog('Next Step', text, getCurrentUser());
                   
                   // Save to database
                   recordChange(job.id, 'next_step_update', {
