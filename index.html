@@ -997,6 +997,30 @@
         try { return JSON.parse(val); } catch { return fallback; }
       },
 
+      // Format timestamp to local time, fallback to EST if needed
+      formatTimestamp(timestamp, includeDate = true) {
+        if (!timestamp) return 'N/A';
+        try {
+          const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+          if (isNaN(date.getTime())) return 'Invalid Date';
+          
+          // Try local timezone first
+          const options = includeDate 
+            ? { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }
+            : { hour: '2-digit', minute: '2-digit', hour12: true };
+          
+          try {
+            return date.toLocaleString('en-US', options);
+          } catch (e) {
+            // Fallback to EST if local timezone fails
+            options.timeZone = 'America/New_York';
+            return date.toLocaleString('en-US', options) + ' EST';
+          }
+        } catch (e) {
+          return 'N/A';
+        }
+      },
+
       // Excel loves odd types. This makes it predictable.
       asString(val) {
         if (val == null) return '';
@@ -3006,8 +3030,7 @@
             const select = document.getElementById('historyVersionSelect');
             select.innerHTML = '<option value="">Current State</option>' + 
                 historyVersions.map((v, idx) => {
-                    const date = new Date(v.timestamp);
-                    const dateStr = date.toLocaleString();
+                    const dateStr = Utils.formatTimestamp(v.timestamp);
                     return `<option value="${idx}">${dateStr} (${v.changeCount} changes)</option>`;
                 }).join('');
             
@@ -3060,7 +3083,7 @@
                     Viewing Historical Version
                 </div>
                 <div class="text-sm text-blue-700">
-                    <strong>Timestamp:</strong> ${new Date(currentHistoryVersion.timestamp).toLocaleString()}<br>
+                    <strong>Timestamp:</strong> ${Utils.formatTimestamp(currentHistoryVersion.timestamp)}<br>
                     <strong>Total Changes:</strong> ${currentHistoryVersion.changeCount}
                 </div>
             </div>
@@ -3078,7 +3101,7 @@
                                     'bg-slate-100 text-slate-700'
                                 }">${change.type.replace('_', ' ')}</span>
                             </div>
-                            <span class="text-xs text-slate-500">${new Date(change.timestamp).toLocaleString()}</span>
+                            <span class="text-xs text-slate-500">${Utils.formatTimestamp(change.timestamp)}</span>
                         </div>
                         <div class="text-sm text-slate-600">
                             ${formatChangeData(change)}
@@ -3136,8 +3159,8 @@
                     Comparing Versions
                 </div>
                 <div class="text-sm text-purple-700">
-                    <strong>Historical:</strong> ${new Date(historicalVersion.timestamp).toLocaleString()} (${historicalChanges.length} changes)<br>
-                    <strong>Current:</strong> ${new Date().toLocaleString()} (${currentChanges.length} changes)
+                    <strong>Historical:</strong> ${Utils.formatTimestamp(historicalVersion.timestamp)} (${historicalChanges.length} changes)<br>
+                    <strong>Current:</strong> ${Utils.formatTimestamp(new Date())} (${currentChanges.length} changes)
                 </div>
             </div>
             
@@ -3183,7 +3206,7 @@
             return;
         }
         
-        const confirmMsg = `Are you sure you want to restore to the version from ${new Date(currentHistoryVersion.timestamp).toLocaleString()}?\n\nThis will replace the current state with ${currentHistoryVersion.changeCount} changes.`;
+        const confirmMsg = `Are you sure you want to restore to the version from ${Utils.formatTimestamp(currentHistoryVersion.timestamp)}?\n\nThis will replace the current state with ${currentHistoryVersion.changeCount} changes.`;
         
         if (!confirm(confirmMsg)) {
             return;
