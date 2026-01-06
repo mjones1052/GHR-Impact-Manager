@@ -743,7 +743,56 @@
                 avSubs: row.avSubs || 0,
                 ghrDeclines: row.ghrDeclines || 0,
                 avDeclines: row.avDeclines || 0,
-                candidates: row.candidates || [],
+                candidates: (row.candidates || []).map(c => {
+                    // Transform API candidate data to frontend format
+                    const submitDate = c.submitDate ? new Date(c.submitDate) : null;
+                    const offerDate = c.offerDate ? new Date(c.offerDate) : null;
+                    const hospDeclineDate = c.hospDeclineDate ? new Date(c.hospDeclineDate) : null;
+                    const agencyDeclineDate = c.agencyDeclineDate ? new Date(c.agencyDeclineDate) : null;
+                    const agencyRetractedDate = c.agencyRetractedDate ? new Date(c.agencyRetractedDate) : null;
+                    
+                    // Determine decline date (whichever happened)
+                    const declineDate = hospDeclineDate || agencyDeclineDate || agencyRetractedDate;
+                    
+                    // Determine decline type
+                    let declineType = '';
+                    if (hospDeclineDate) declineType = 'Hospital Declined';
+                    else if (agencyDeclineDate) declineType = 'Agency Declined';
+                    else if (agencyRetractedDate) declineType = 'Agency Retracted';
+                    
+                    // Generate alert for active candidates
+                    let alert = null;
+                    if (!c.isDeclined && submitDate) {
+                        const daysAgo = Utils.calcDays(submitDate);
+                        if (offerDate) {
+                            alert = { level: 'green', text: 'OFFER PENDING' };
+                        } else if (daysAgo <= 2) {
+                            alert = { level: 'green', text: 'NEW SUBMISSION' };
+                        } else if (daysAgo <= 5) {
+                            alert = { level: 'yellow', text: 'PENDING REVIEW' };
+                        } else if (daysAgo <= 10) {
+                            alert = { level: 'yellow', text: 'AWAITING FEEDBACK' };
+                        } else {
+                            alert = { level: 'red', text: 'NEEDS ATTENTION' };
+                        }
+                    }
+                    
+                    return {
+                        name: c.name || 'Unknown',
+                        agency: c.agency || 'Unknown',
+                        date: submitDate,
+                        offerDate: offerDate,
+                        awardedDate: c.awardedDate ? new Date(c.awardedDate) : null,
+                        rto: c.rto || null,
+                        isDeclined: c.isDeclined || false,
+                        declineType: declineType,
+                        declineReason: c.declineReason || '',
+                        declineDate: declineDate,
+                        isGHR: c.isGHR || false,
+                        isActive: c.isActive || false,
+                        alert: alert
+                    };
+                }),
                 levers: {
                     socialMedia: { done: false, user: '', time: '' },
                     agencyOutreach: { done: false, user: '', time: '' },
