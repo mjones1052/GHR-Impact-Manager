@@ -17,7 +17,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # ⚠️ TODO: Update table name if different
         cursor.execute('''
             SELECT 
-                Req_ID as position_id,
+                Contract_ID as position_id,     -- Changed from Req_ID
+                Req_ID as req_id,               -- Keep Req_ID as secondary field
                 Program as program,
                 Facility as facility,
                 Position_Type as specialty,
