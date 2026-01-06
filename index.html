@@ -642,6 +642,38 @@
                 window.showToast(`Loaded ${processedJobs.length} positions from database`, 'success');
             }
             
+            // Load stats data for the Stats tab
+            try {
+                const statsResponse = await fetch(`${API_BASE_URL}/stats-data`);
+                if (statsResponse.ok) {
+                    const statsData = await statsResponse.json();
+                    
+                    // Convert date strings to Date objects for onAssignment
+                    if (statsData.onAssignment) {
+                        statsData.onAssignment.forEach(r => {
+                            r.startDate = r.startDate ? new Date(r.startDate) : null;
+                            r.endDate = r.endDate ? new Date(r.endDate) : null;
+                        });
+                    }
+                    
+                    // Convert date strings to Date objects for upcoming
+                    if (statsData.upcoming) {
+                        statsData.upcoming.forEach(r => {
+                            r.startDate = r.startDate ? new Date(r.startDate) : null;
+                        });
+                    }
+                    
+                    window.store.state.statsData = statsData;
+                    console.log(`Loaded ${statsData.onAssignment?.length || 0} active assignments and ${statsData.upcoming?.length || 0} upcoming starts`);
+                } else {
+                    console.warn('Could not load stats data');
+                    window.store.state.statsData = { onAssignment: [], upcoming: [] };
+                }
+            } catch (statsError) {
+                console.warn('Error loading stats data:', statsError);
+                window.store.state.statsData = { onAssignment: [], upcoming: [] };
+            }
+            
             Utils.setLoading(false);
             return true;
         } catch (error) {
