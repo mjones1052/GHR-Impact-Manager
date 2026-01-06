@@ -407,6 +407,29 @@
     // Global change log and history
     let changeLog = [];
     let historyVersions = [];
+    
+    // Current user management
+    let currentUserName = localStorage.getItem('ghr_user_name') || '';
+    
+    function getCurrentUser() {
+        if (!currentUserName) {
+            currentUserName = prompt('Please enter your name for change tracking:');
+            if (currentUserName) {
+                localStorage.setItem('ghr_user_name', currentUserName);
+            } else {
+                currentUserName = 'Anonymous';
+            }
+        }
+        return currentUserName;
+    }
+    
+    function setCurrentUser(name) {
+        currentUserName = name;
+        localStorage.setItem('ghr_user_name', name);
+    }
+    
+    // Allow user to change their name via console: setCurrentUser('New Name')
+    window.setCurrentUser = setCurrentUser;
 
 
 
@@ -867,7 +890,7 @@
             jobId: jobId,
             type: changeType,
             data: changeData,
-            user: 'Current User'
+            user: getCurrentUser()
         };
         
         changeLog.push(change);
