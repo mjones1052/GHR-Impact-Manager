@@ -15,7 +15,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         cursor = conn.cursor()
         
-        # Active Assignments
+        # Active Assignments (currently on assignment)
         cursor.execute('''
             SELECT 
                 Agency,
@@ -25,8 +25,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 Start_Date AS startDate,
                 End_Date AS endDate
             FROM dhc.B4HealthOrder
-            WHERE GETDATE() BETWEEN Start_Date AND End_Date
-              AND Contract_Status = 'Active'
+            WHERE Contract_Status = 'Closed And Awarded'
+              AND GETDATE() BETWEEN Start_Date AND End_Date
             ORDER BY Start_Date DESC
         ''')
         
@@ -40,17 +40,17 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 row_dict['endDate'] = row_dict['endDate'].isoformat()
             onAssignment.append(row_dict)
         
-        # Upcoming Starts
+        # Upcoming Starts (awarded but not started yet)
         cursor.execute('''
             SELECT 
+                Agency,
                 Program AS system,
                 Facility AS facility,
                 Position_Type AS specialty,
                 Start_Date AS startDate
             FROM dhc.B4HealthOrder
-            WHERE Start_Date > GETDATE()
-              AND Start_Date <= DATEADD(month, 3, GETDATE())
-              AND Contract_Status IN ('Active', 'Awarded', 'Pending')
+            WHERE Contract_Status = 'Closed And Awarded'
+              AND Start_Date > GETDATE()
             ORDER BY Start_Date ASC
         ''')
         
@@ -64,6 +64,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         conn.close()
         
+        print(f"Returning {len(onAssignment)} active, {len(upcoming)} upcoming")
+        
         return func.HttpResponse(
             json.dumps({
                 'onAssignment': onAssignment,
@@ -73,6 +75,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             status_code=200
         )
     except Exception as e:
+        print(f"Stats error: {e}")
         return func.HttpResponse(
             json.dumps({'error': str(e)}),
             mimetype="application/json",
