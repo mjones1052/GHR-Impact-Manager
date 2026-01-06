@@ -1822,16 +1822,19 @@
                 const specialties = Object.keys(hierarchy[sys][fac]).sort();
                 specialties.forEach(spec => {
                     const jobs = hierarchy[sys][fac][spec];
+                    // Helper to parse bill rate (strips $ and other characters)
+                    const parseBillRate = (rate) => parseFloat(String(rate || '0').replace(/[^0-9.]/g, '')) || 0;
+                    
                     // Sort jobs by rate descending
-                    jobs.sort((a, b) => parseFloat(b.billRate) - parseFloat(a.billRate));
+                    jobs.sort((a, b) => parseBillRate(b.billRate) - parseBillRate(a.billRate));
                     
                     const volume = jobs.length;
-                    const maxRate = Math.max(...jobs.map(j => parseFloat(j.billRate)));
-                    const minRate = Math.min(...jobs.map(j => parseFloat(j.billRate)));
+                    const maxRate = Math.max(...jobs.map(j => parseBillRate(j.billRate)));
+                    const minRate = Math.min(...jobs.map(j => parseBillRate(j.billRate)));
                     // Safe display logic to avoid NaN
-                    const rateDisplay = (minRate !== maxRate && !isNaN(minRate)) 
+                    const rateDisplay = (minRate !== maxRate && minRate > 0) 
                         ? `$${minRate.toFixed(0)} - $${maxRate.toFixed(0)}` 
-                        : (!isNaN(maxRate) ? `$${maxRate.toFixed(0)}` : 'N/A');
+                        : (maxRate > 0 ? `$${maxRate.toFixed(0)}` : 'N/A');
                     
                     html += `
                         <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden transition-all hover:shadow-md">
