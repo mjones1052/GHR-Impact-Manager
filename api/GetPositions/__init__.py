@@ -26,6 +26,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 Position_Type AS specialty,
                 Order_Date_Created AS date_added,
                 Unit AS unit,
+                Cost_Center AS cost_center,
                 Awarded_Rate AS bill_rate,
                 Time_Type AS time_type,
                 Start_Time AS start_time,
