@@ -211,6 +211,19 @@
                 title="View change history">
           <i data-lucide="history" class="w-4 h-4"></i>
         </button>
+        
+        <!-- User Display & Logout -->
+        <div class="flex items-center gap-2 ml-2 pl-2 border-l border-slate-300">
+          <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-md px-3 h-[38px] shadow-sm">
+            <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
+            <span id="currentUserDisplay" class="text-sm font-medium text-slate-700 max-w-[120px] truncate">Loading...</span>
+          </div>
+          <button onclick="logout()" 
+                  class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                  title="Sign out">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -445,16 +458,56 @@
     let changeLog = [];
     let historyVersions = [];
     
-    // Current user management
+    // Current user management - uses Azure AD if available, falls back to prompt
     let currentUserName = localStorage.getItem('ghr_user_name') || '';
+    let azureUserLoaded = false;
+    
+    // Try to get user from Azure AD authentication
+    async function loadAzureUser() {
+        try {
+            const response = await fetch('/.auth/me');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.clientPrincipal) {
+                    // Use the user's name or email from Azure AD
+                    const userName = data.clientPrincipal.userDetails || 
+                                     data.clientPrincipal.claims?.find(c => c.typ === 'name')?.val ||
+                                     data.clientPrincipal.claims?.find(c => c.typ === 'preferred_username')?.val ||
+                                     'Azure User';
+                    currentUserName = userName;
+                    localStorage.setItem('ghr_user_name', userName);
+                    azureUserLoaded = true;
+                    console.log('Azure AD user loaded:', userName);
+                    
+                    // Update UI if user display element exists
+                    updateUserDisplay();
+                    return userName;
+                }
+            }
+        } catch (e) {
+            console.log('Azure AD auth not available, using fallback');
+        }
+        return null;
+    }
+    
+    function updateUserDisplay() {
+        const userEl = document.getElementById('currentUserDisplay');
+        if (userEl && currentUserName) {
+            userEl.textContent = currentUserName;
+            userEl.title = 'Logged in as ' + currentUserName;
+        }
+    }
     
     function getCurrentUser() {
         if (!currentUserName) {
-            currentUserName = prompt('Please enter your name for change tracking:');
-            if (currentUserName) {
-                localStorage.setItem('ghr_user_name', currentUserName);
-            } else {
-                currentUserName = 'Anonymous';
+            // Only prompt if Azure AD didn't provide a user
+            if (!azureUserLoaded) {
+                currentUserName = prompt('Please enter your name for change tracking:');
+                if (currentUserName) {
+                    localStorage.setItem('ghr_user_name', currentUserName);
+                } else {
+                    currentUserName = 'Anonymous';
+                }
             }
         }
         return currentUserName;
@@ -463,10 +516,21 @@
     function setCurrentUser(name) {
         currentUserName = name;
         localStorage.setItem('ghr_user_name', name);
+        updateUserDisplay();
+    }
+    
+    // Logout function for Azure AD
+    function logout() {
+        localStorage.removeItem('ghr_user_name');
+        window.location.href = '/.auth/logout';
     }
     
     // Allow user to change their name via console: setCurrentUser('New Name')
     window.setCurrentUser = setCurrentUser;
+    window.logout = logout;
+    
+    // Load Azure user on startup
+    loadAzureUser();
     
     // Default margin from environment variable (loaded from API)
     let defaultMargin = 25; // Fallback default

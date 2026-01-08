@@ -1,11 +1,56 @@
 {
-  "navigationFallback": {
-    "rewrite": "/index.html"
+  "auth": {
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0",
+          "clientIdSettingName": "AAD_CLIENT_ID",
+          "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        }
+      }
+    }
   },
   "routes": [
     {
       "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/*.html",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/.auth/login/aad",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/logout",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/.auth/*",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/favicon.ico",
       "allowedRoles": ["anonymous"]
     }
-  ]
+  ],
+  "responseOverrides": {
+    "401": {
+      "redirect": "/.auth/login/aad",
+      "statusCode": 302
+    }
+  },
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/.auth/*", "/favicon.ico"]
+  },
+  "platform": {
+    "apiRuntime": "python:3.9"
+  }
 }
