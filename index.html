@@ -37,6 +37,51 @@
     .toast { pointer-events: auto; transition: all 0.3s ease; }
 
     .hot-job-active { color: #ef4444; fill: #fee2e2; }
+    
+    /* Custom instant tooltips for KPI cards */
+    .kpi-tooltip {
+      position: relative;
+    }
+    .kpi-tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s, visibility 0.15s;
+      pointer-events: none;
+      z-index: 50;
+      margin-bottom: 6px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .kpi-tooltip::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #1e293b;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s, visibility 0.15s;
+      pointer-events: none;
+      z-index: 50;
+    }
+    .kpi-tooltip:hover::after,
+    .kpi-tooltip:hover::before {
+      opacity: 1;
+      visibility: visible;
+    }
   </style>
 </head>
 
@@ -2341,7 +2386,7 @@
           <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
             <div class="flex justify-between items-start mb-2">
               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${c.label}</span>
-              <span class="cursor-help" title="${c.tooltip}"><i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i></span>
+              <span class="kpi-tooltip cursor-help" data-tooltip="${c.tooltip}"><i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i></span>
             </div>
             <div class="text-2xl font-bold text-slate-800">${c.val}</div>
           </div>
