@@ -2248,7 +2248,7 @@
             </div>
             <div class="col-span-1 text-xs truncate font-medium text-slate-700" title="${job.program}">${job.program}</div>
             <div class="col-span-3 pr-4 pl-2">
-              <div class="text-[10px] uppercase font-bold text-slate-400 truncate" title="${job.requisitionReason || job.system}">${job.requisitionReason || job.system}</div>
+              <div class="text-[10px] uppercase font-bold text-slate-400 truncate" title="${job.requisitionReason || 'No Reason Given'}">${job.requisitionReason || 'No Reason Given'}</div>
               <div class="font-bold text-sm truncate">${job.facility}</div>
               <div class="text-xs text-slate-500 truncate" title="${job.shiftTime ? `${job.shiftTime}${job.shift && job.shift !== 'N/A' ? ` (${job.shift})` : ''}` : (job.shift || '')}">
                 ${abbrSpecialty}${showUnit ? ` • ${job.unit}` : ''}${job.costCenter ? ` • ${job.costCenter}` : ''}${job.startTime && job.endTime ? ` • ${job.startTime}-${job.endTime}` : (job.shift && job.shift !== 'N/A' ? ` • ${job.shift}` : '')}
