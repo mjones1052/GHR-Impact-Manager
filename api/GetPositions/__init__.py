@@ -41,7 +41,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 COALESCE(b.Time_Type, CAST(o.[Shift Hours] AS NVARCHAR(50))) AS time_type,
                 b.Start_Time AS start_time,
                 b.End_Time AS end_time,
-                b.Contract_Status AS status
+                b.Contract_Status AS status,
+                b.Health_System AS health_system
             FROM dhc.B4HEALTHOPENORDER o
             LEFT JOIN dhc.B4HealthOrder b 
                 ON RTRIM(LTRIM(o.[Position ID])) = RTRIM(LTRIM(b.Contract_ID))
