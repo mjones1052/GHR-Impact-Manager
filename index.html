@@ -989,7 +989,9 @@
                         declineDate: declineDate,
                         isGHR: c.isGHR || false,
                         isActive: c.isActive || false,
-                        alert: alert
+                        alert: alert,
+                        interviewDate: null,
+                        removedFromQueue: false
                     };
                 }),
                 levers: {
@@ -1049,6 +1051,27 @@
                 case 'history_update':
                     if (Array.isArray(change.data.history)) {
                         job.history = [...change.data.history];
+                    }
+                    break;
+                case 'interview_scheduled':
+                    // Find candidate by name and agency
+                    const interviewCandidate = job.candidates.find(c => 
+                        c.name === change.data.candidateName && 
+                        c.agency === change.data.candidateAgency
+                    );
+                    if (interviewCandidate) {
+                        interviewCandidate.interviewDate = change.data.interviewDate;
+                    }
+                    break;
+                case 'candidate_removed':
+                    // Find candidate by name and agency
+                    const removedCandidate = job.candidates.find(c => 
+                        c.name === change.data.candidateName && 
+                        c.agency === change.data.candidateAgency
+                    );
+                    if (removedCandidate) {
+                        removedCandidate.removedFromQueue = true;
+                        removedCandidate.declineReason = change.data.reason;
                     }
                     break;
             }
@@ -1684,7 +1707,8 @@
               offerDate: offerDate,
               reqReason: n.reqReason, // Captured here
               alert: alertData,
-              interviewDate: null
+              interviewDate: null,
+              removedFromQueue: false
             });
           });
         }
@@ -2345,6 +2369,10 @@
                           // Active Candidate Prompts
                           if (c.offerDate) {
                               centerContent = `<div class="text-green-600 font-bold bg-green-50 px-1 rounded inline-block">Offer Pending</div>`;
+                          } else if (c.interviewDate) {
+                              centerContent = `<div class="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded inline-block">📅 Interview: ${c.interviewDate}</div>`;
+                          } else if (c.removedFromQueue) {
+                              centerContent = `<div class="text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded inline-block line-through">Removed: ${c.declineReason || 'N/A'}</div>`;
                           } else {
                               const alertColor = c.alert ? (c.alert.level === 'green' ? 'text-emerald-600' : (c.alert.level === 'yellow' ? 'text-amber-600' : 'text-red-600')) : 'text-slate-500';
                               centerContent = `<div class="${alertColor} font-bold uppercase tracking-wide truncate" title="${c.alert ? c.alert.text : 'Pending'}">${c.alert ? c.alert.text : 'Pending'}</div>`;
@@ -2360,9 +2388,16 @@
                           rightContent += `<div class="text-red-400 text-[9px] mt-0.5">Dec: ${c.declineDate.toLocaleDateString()}</div>`;
                       }
 
+                      // Determine if candidate is actionable (active tab, not already declined/removed)
+                      const isActionable = view === 'active' && !c.isDeclined && !c.removedFromQueue;
+                      const clickHandler = isActionable 
+                        ? `onclick="window.store.dispatch('OPEN_MODAL',{type:'candidate_action',jobId:'${job.id}',candidateIndex:${originalIndex}})"` 
+                        : '';
+                      const cursorClass = isActionable ? 'cursor-pointer' : 'cursor-default';
+
                       return `
-                        <div class="px-3 py-2 border-b last:border-0 transition-colors cursor-pointer grid grid-cols-12 gap-2 items-center ${rowBgClass}"
-                             onclick="window.store.dispatch('OPEN_MODAL',{type:'candidate_action',jobId:'${job.id}',candidateIndex:${originalIndex}})">
+                        <div class="px-3 py-2 border-b last:border-0 transition-colors grid grid-cols-12 gap-2 items-center ${rowBgClass} ${cursorClass}"
+                             ${clickHandler}>
                           
                           <!-- Left: Name & Agency -->
                           <div class="col-span-4 min-w-0">
@@ -2973,12 +3008,29 @@
                   if (!date) { window.showToast("Please enter interview date.", 'error'); return; }
                   cand.interviewDate = date;
                   pushLog('Interview', `Scheduled ${date} for ${cand.name}`, tag);
+                  
+                  // Save to database
+                  recordChange(job.id, 'interview_scheduled', {
+                    candidateName: cand.name,
+                    candidateAgency: cand.agency,
+                    interviewDate: date,
+                    taggedUser: tag
+                  });
+                  
                 } else if (actionType === 'remove_candidate') {
                   const reason = $('removeReasonInput')?.value || '';
                   if (!reason) { window.showToast("Please select a reason.", 'error'); return; }
-                  cand.isDeclined = true;
+                  cand.removedFromQueue = true;
                   cand.declineReason = reason;
                   pushLog('Removed', `${cand.name} moved to declined (${reason})`, tag);
+                  
+                  // Save to database
+                  recordChange(job.id, 'candidate_removed', {
+                    candidateName: cand.name,
+                    candidateAgency: cand.agency,
+                    reason: reason,
+                    taggedUser: tag
+                  });
                 }
               }
 
@@ -3297,7 +3349,14 @@
             </div>
             
             <div class="space-y-2 max-h-[500px] overflow-y-auto">
-                ${historicalData.changes.length > 0 ? [...historicalData.changes].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).map(change => `
+                ${historicalData.changes.length > 0 ? [...historicalData.changes].sort((a, b) => {
+                    // Ensure timestamps are parsed as UTC
+                    let tsA = a.timestamp || '';
+                    let tsB = b.timestamp || '';
+                    if (tsA && !tsA.endsWith('Z') && !tsA.includes('+')) tsA += 'Z';
+                    if (tsB && !tsB.endsWith('Z') && !tsB.includes('+')) tsB += 'Z';
+                    return new Date(tsB) - new Date(tsA);
+                }).map(change => `
                     <div class="border rounded p-3 bg-white hover:shadow-md transition-shadow">
                         <div class="flex justify-between items-start mb-2">
                             <div>
