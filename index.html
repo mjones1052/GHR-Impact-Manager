@@ -1179,7 +1179,8 @@
                     }
                     break;
                 case 'margin_update':
-                    job.margin = change.data.margin;
+                    const m = parseFloat(change.data.margin);
+                    job.margin = (Number.isFinite(m) && m % 1 === 0) ? m.toString() : change.data.margin;
                     job.marginOverridden = true;  // Mark as manually set
                     break;
                 case 'next_step_update':
