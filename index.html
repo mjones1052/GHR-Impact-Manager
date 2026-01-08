@@ -479,16 +479,25 @@
                     // Log full response for debugging
                     console.log('Azure AD response:', JSON.stringify(data.clientPrincipal, null, 2));
                     
-                    // Priority: display name > name claim > preferred_username > userDetails (email)
+                    // Get claim value by type (handles both short and full URIs)
                     const claims = data.clientPrincipal.claims || [];
-                    const getName = (type) => claims.find(c => c.typ === type || c.typ?.endsWith('/' + type))?.val;
+                    const getName = (type) => claims.find(c => c.typ === type || c.typ?.includes(type))?.val;
                     
-                    const userName = getName('name') || 
-                                     getName('displayname') ||
-                                     getName('given_name') && getName('family_name') ? `${getName('given_name')} ${getName('family_name')}` : null ||
-                                     getName('preferred_username')?.split('@')[0] || // First part of email as fallback
-                                     data.clientPrincipal.userDetails?.split('@')[0] || // First part of userDetails
-                                     'Azure User';
+                    // Priority: given_name + family_name > name > displayname > fallbacks
+                    let userName = null;
+                    
+                    const givenName = getName('givenname') || getName('given_name');
+                    const familyName = getName('surname') || getName('family_name');
+                    
+                    if (givenName && familyName) {
+                        userName = `${givenName} ${familyName}`;
+                    } else {
+                        userName = getName('name') || 
+                                   getName('displayname') ||
+                                   getName('preferred_username')?.split('@')[0] ||
+                                   data.clientPrincipal.userDetails?.split('@')[0] ||
+                                   'Azure User';
+                    }
                     
                     currentUserName = userName;
                     localStorage.setItem('ghr_user_name', userName);
