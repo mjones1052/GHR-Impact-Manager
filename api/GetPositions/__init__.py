@@ -17,26 +17,34 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         cursor = conn.cursor()
         
-        # Get open positions with all needed fields
+        # Get open positions from B4HEALTHOPENORDER, joining to B4HealthOrder for additional fields
         cursor.execute('''
             SELECT 
-                RTRIM(LTRIM(Contract_ID)) AS position_id,
-                Req_ID AS req_id,
-                Program AS program,
-                Facility AS facility,
-                Position_Type AS specialty,
-                Order_Date_Created AS date_added,
-                Unit AS unit,
-                Cost_Center AS cost_center,
-                Awarded_Rate AS bill_rate,
-                Time_Type AS time_type,
-                Start_Time AS start_time,
-                End_Time AS end_time,
-                Hiring_Manager AS hiring_manager,
-                Contract_Status AS status
-            FROM dhc.B4HealthOrder
-            WHERE Contract_Status = 'Open'
-            ORDER BY Order_Date_Created DESC
+                RTRIM(LTRIM(o.[Position ID])) AS position_id,
+                o.[Program] AS program,
+                o.[Facility Name] AS facility,
+                o.[Specialty Name] AS specialty,
+                o.[Date Added] AS date_added,
+                o.[Unit Name] AS unit,
+                o.[Cost Center] AS cost_center,
+                o.[Bill Rate] AS bill_rate,
+                o.[Shift Hours] AS shift_hours,
+                o.[Shift Time] AS shift_time,
+                o.[Hiring Manager] AS hiring_manager,
+                o.[# of Submissions] AS num_submissions,
+                o.[Number of Positions] AS num_positions,
+                o.[Requisition_Reason] AS requisition_reason,
+                o.[Shift Diff] AS shift_diff,
+                o.[Min Hours] AS min_hours,
+                -- Get from old table if not in new table
+                COALESCE(b.Time_Type, o.[Shift Hours]) AS time_type,
+                b.Start_Time AS start_time,
+                b.End_Time AS end_time,
+                b.Contract_Status AS status
+            FROM dhc.B4HEALTHOPENORDER o
+            LEFT JOIN dhc.B4HealthOrder b 
+                ON RTRIM(LTRIM(o.[Position ID])) = RTRIM(LTRIM(b.Contract_ID))
+            ORDER BY o.[Date Added] DESC
         ''')
         
         columns = [column[0] for column in cursor.description]

@@ -304,6 +304,10 @@
             <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','id')">ID <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
             <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','program')">Category <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
             <div class="col-span-3 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','facility')">System / Facility / Specialty <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+            <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex flex-col justify-center items-center" onclick="store.dispatch('SORT','numPositions')">
+              <div class="flex items-center"># <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+              <div class="text-[9px] text-slate-400 font-normal">Pos</div>
+            </div>
             <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','billRate')">Bill Rate <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
             <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','daysPast')">Days <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
             <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex justify-center items-center" onclick="store.dispatch('SORT','margin')">Margin <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
@@ -312,7 +316,7 @@
               <div class="flex items-center">Active <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
               <div class="text-[9px] text-slate-400 font-normal">GHR / Agency</div>
             </div>
-            <div class="col-span-2 text-center cursor-pointer hover:text-blue-600 flex flex-col justify-center items-center" onclick="store.dispatch('SORT','ghrDeclines')">
+            <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex flex-col justify-center items-center" onclick="store.dispatch('SORT','ghrDeclines')">
               <div class="flex items-center">Declines <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
               <div class="text-[9px] text-slate-400 font-normal">GHR / Agency</div>
             </div>
@@ -942,6 +946,10 @@
                 endTime: String(row.end_time || ''),
                 hiringManager: String(row.hiring_manager || row.manager || 'Unknown'),
                 status: String(row.status || row.notes || 'No updates'),
+                numPositions: row.num_positions || 1,
+                requisitionReason: String(row.requisition_reason || ''),
+                shiftDiff: row.shift_diff || '',
+                minHours: row.min_hours || '',
                 margin: row.margin || defaultMargin,
                 marginOverridden: false,  // Track if margin was manually set
                 ghrSubs: row.ghrSubs || 0,
@@ -2240,12 +2248,13 @@
             </div>
             <div class="col-span-1 text-xs truncate font-medium text-slate-700" title="${job.program}">${job.program}</div>
             <div class="col-span-3 pr-4 pl-2">
-              <div class="text-[10px] uppercase font-bold text-slate-400">${job.system}</div>
+              <div class="text-[10px] uppercase font-bold text-slate-400 truncate" title="${job.requisitionReason || job.system}">${job.requisitionReason || job.system}</div>
               <div class="font-bold text-sm truncate">${job.facility}</div>
               <div class="text-xs text-slate-500 truncate" title="${job.shiftTime ? `${job.shiftTime}${job.shift && job.shift !== 'N/A' ? ` (${job.shift})` : ''}` : (job.shift || '')}">
                 ${abbrSpecialty}${showUnit ? ` • ${job.unit}` : ''}${job.costCenter ? ` • ${job.costCenter}` : ''}${job.startTime && job.endTime ? ` • ${job.startTime}-${job.endTime}` : (job.shift && job.shift !== 'N/A' ? ` • ${job.shift}` : '')}
               </div>
             </div>
+            <div class="col-span-1 text-center font-bold text-slate-700 text-sm">${job.numPositions || 1}</div>
             <div class="col-span-1 text-center font-bold text-slate-700 text-xs">${job.billRate}</div>
             <div class="col-span-1 text-center">
               <span class="inline-flex font-bold text-xs ${bubbleClasses} ${bubbleText} rounded-full w-8 h-8 items-center justify-center mx-auto">${job.daysPast}</span>
@@ -2254,13 +2263,12 @@
                  onclick="event.stopPropagation(); window.store.dispatch('OPEN_MODAL',{type:'margin',jobId:'${job.id}',val:'${job.margin}'})">${job.margin}%</div>
             <div class="col-span-1 text-center font-bold text-slate-700">${impact}%</div>
             <div class="col-span-1 text-center font-medium text-slate-700"><span class="text-blue-600">${job.ghrSubs}</span> <span class="text-slate-300">/</span> <span class="text-blue-600">${job.avSubs}</span></div>
-            <div class="col-span-2 text-center font-medium text-slate-700 ${totalDeclines > 0 ? 'cursor-help hover:bg-slate-100 rounded transition-colors group-declines' : ''}"
+            <div class="col-span-1 text-center font-medium text-slate-700 ${totalDeclines > 0 ? 'cursor-help hover:bg-slate-100 rounded transition-colors group-declines' : ''}"
                  onclick="${totalDeclines > 0 ? `event.stopPropagation(); window.store.dispatch('ANALYZE_DECLINES',{id:'${job.id}'})` : ''}"
                  title="${totalDeclines > 0 ? 'Click to Analyze' : ''}">
                  <span class="text-red-500">${job.ghrDeclines}</span> <span class="text-slate-300">/</span> <span class="text-red-500">${job.avDeclines}</span>
                  ${totalDeclines > 0 ? '<i data-lucide="pie-chart" class="w-3 h-3 text-slate-400 inline ml-1 opacity-0 group-hover:opacity-100 group-[.group-declines]:opacity-50"></i>' : ''}
             </div>
-            <div class="col-span-1 text-center"><i data-lucide="${expanded ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-slate-400 group-hover:text-blue-600"></i></div>
           </div>
         `;
 
