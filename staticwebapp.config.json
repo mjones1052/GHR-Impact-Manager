@@ -15,32 +15,20 @@
   },
   "routes": [
     {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/*.html",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/.auth/login/aad",
-      "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/.auth/logout",
-      "allowedRoles": ["anonymous", "authenticated"]
-    },
-    {
       "route": "/.auth/*",
       "allowedRoles": ["anonymous"]
     },
     {
       "route": "/favicon.ico",
       "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/*",
+      "allowedRoles": ["authenticated"]
     }
   ],
   "responseOverrides": {
