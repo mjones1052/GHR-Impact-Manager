@@ -158,6 +158,11 @@
       
       <!-- User Display & Logout - Top Right -->
       <div class="flex items-center gap-2">
+        <button onclick="openSettingsModal()" 
+                class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                title="Settings">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
         <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-md px-3 h-[38px] shadow-sm">
           <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
           <span id="currentUserDisplay" class="text-sm font-medium text-slate-700 max-w-[200px] truncate">Loading...</span>
@@ -268,6 +273,71 @@
         <div id="historyContent" class="border rounded-lg p-4 bg-slate-50 min-h-[400px]">
           <!-- History content loaded here -->
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/50 z-[90] flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-lg shadow-2xl w-11/12 max-w-4xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+        <h3 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="settings" class="w-6 h-6 text-slate-600"></i> Settings
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto">
+        <h4 class="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+          <i data-lucide="building-2" class="w-5 h-5 text-blue-600"></i> Health System Mappings
+        </h4>
+        <p class="text-sm text-slate-500 mb-4">Map facility name keywords to normalized health system names. Keywords are matched case-insensitively.</p>
+        
+        <div class="border rounded-lg overflow-hidden mb-4">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="text-left p-3 font-semibold text-slate-700">Keywords (comma-separated)</th>
+                <th class="text-left p-3 font-semibold text-slate-700 w-48">Health System</th>
+                <th class="w-16 p-3"></th>
+              </tr>
+            </thead>
+            <tbody id="mappingsTableBody" class="divide-y">
+              <!-- Mappings loaded here -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="flex justify-between items-center">
+          <div class="flex gap-2">
+            <button onclick="addMappingRow()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
+              <i data-lucide="plus" class="w-4 h-4"></i> Add Mapping
+            </button>
+            <button onclick="resetMappingsToDefaults()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset to Defaults
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="exportMappings()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
+              <i data-lucide="download" class="w-4 h-4"></i> Export
+            </button>
+            <label class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded text-sm font-medium flex items-center gap-1 cursor-pointer">
+              <i data-lucide="upload" class="w-4 h-4"></i> Import
+              <input type="file" accept=".json" onchange="importMappings(event)" class="hidden">
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="bg-slate-100 p-4 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="closeSettingsModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-6 py-2 rounded text-sm font-medium">
+          Cancel
+        </button>
+        <button onclick="saveSettings()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded text-sm font-medium flex items-center gap-1">
+          <i data-lucide="check" class="w-4 h-4"></i> Save Changes
+        </button>
       </div>
     </div>
   </div>
@@ -579,6 +649,30 @@
     // 1. CONFIG & CONSTANTS
     // ==========================
     const CONSTANTS = {
+      // ===========================================
+      // HEALTH SYSTEM MAPPING
+      // Update this section to add/modify health system mappings
+      // Keywords are matched case-insensitively against facility names
+      // First match wins - order matters!
+      // ===========================================
+      HEALTH_SYSTEM_MAPPINGS: [
+        { keywords: ['capital', 'hopewell', 'deborah'], system: 'Capital Health' },
+        { keywords: ['cooper', 'cape'], system: 'Cooper' },
+        { keywords: ['redeemer'], system: 'Holy Redeemer' },
+        { keywords: ['hunterdon'], system: 'Hunterdon' },
+        { keywords: ['inspira'], system: 'Inspira' },
+        { keywords: ['richmond', 'rumc'], system: 'RUMC' },
+        { keywords: ['st. luke', 'sellersville', 'miners', 'carbon', 'lehigh'], system: 'St Lukes' },
+        { keywords: ['penn', 'lancaster', 'chester', 'hup', 'presbyterian'], system: 'UPHS' },
+        { keywords: ['virtua'], system: 'Virtua' },
+        { keywords: ['jefferson', 'einstein', 'magee'], system: 'Jefferson' },
+        { keywords: ['main line', 'mlh', 'lankenau', 'paoli'], system: 'Main Line Health' },
+        { keywords: ['tower'], system: 'Tower Health' },
+        { keywords: ['temple', 'jeanes'], system: 'Temple Health' },
+        { keywords: ['trinity', 'mercy', 'st. mary', 'nazareth', 'st. francis'], system: 'Trinity Health' },
+      ],
+      // ===========================================
+      
       TEAM_MEMBERS: [
         { name: "Alyssa Comita", email: "acomita@ghrhealthcare.com" },
         { name: "Alyssa Depte", email: "adepte@ghrhealthcare.com" },
@@ -746,6 +840,23 @@
                 }
             } catch (configError) {
                 console.warn('Could not load config, using default margin:', defaultMargin);
+            }
+            
+            // Fetch health system mappings from database
+            try {
+                const mappingsResponse = await fetch(`${API_BASE_URL}/system-mappings`);
+                if (mappingsResponse.ok) {
+                    const mappingsData = await mappingsResponse.json();
+                    if (mappingsData.mappings && mappingsData.mappings.length > 0) {
+                        CONSTANTS.HEALTH_SYSTEM_MAPPINGS = mappingsData.mappings.map(m => ({
+                            keywords: Array.isArray(m.keywords) ? m.keywords : m.keywords.split(',').map(k => k.trim()),
+                            system: m.system_name
+                        }));
+                        console.log('Loaded', CONSTANTS.HEALTH_SYSTEM_MAPPINGS.length, 'health system mappings from database');
+                    }
+                }
+            } catch (mappingsError) {
+                console.warn('Could not load mappings from database, using defaults');
             }
             
             // Try to fetch from database first
@@ -933,13 +1044,14 @@
         
         // Convert raw DB positions to job format
         rawPositions.forEach(row => {
+            const facilityName = String(row.facility_name || row.facility || '');
             const job = {
                 id: String(row.position_id || row.id || row.req_id || ''),
                 positionId: String(row.position_id || row.req_id || ''),
                 system: String(row.program || row.system || ''),
                 program: String(row.program || row.system || ''),
-                healthSystem: String(row.health_system || ''),
-                facility: String(row.facility_name || row.facility || ''),
+                healthSystem: Utils.getHealthSystem(facilityName, row.health_system),
+                facility: facilityName,
                 specialty: String(row.specialty_name || row.specialty || ''),
                 unit: String(row.unit_name || row.unit || ''),
                 costCenter: String(row.cost_center || ''),
@@ -1276,6 +1388,28 @@
         if (parts.length < 2) return fullName;
         // Return First Name + Last Initial + .
         return parts[0] + ' ' + parts[parts.length - 1].charAt(0) + '.';
+      },
+
+      /**
+       * Get normalized health system name from facility name
+       * Falls back to database value if no mapping match
+       */
+      getHealthSystem(facilityName, dbHealthSystem) {
+        if (!facilityName && !dbHealthSystem) return '';
+        
+        const f = (facilityName || '').toLowerCase();
+        
+        // Check each mapping in CONSTANTS
+        for (const mapping of CONSTANTS.HEALTH_SYSTEM_MAPPINGS) {
+          for (const keyword of mapping.keywords) {
+            if (f.includes(keyword)) {
+              return mapping.system;
+            }
+          }
+        }
+        
+        // No match found - return database value or empty string
+        return dbHealthSystem || '';
       },
 
       calculateImpactPercent(levers) {
@@ -3337,6 +3471,210 @@
         document.getElementById('historyModal').classList.add('hidden');
         currentHistoryVersion = null;
     };
+    
+    // ==========================================
+    // SETTINGS MODAL FUNCTIONS
+    // ==========================================
+    
+    let currentMappings = [];
+    
+    window.openSettingsModal = async function() {
+        document.getElementById('settingsModal').classList.remove('hidden');
+        lucide.createIcons();
+        
+        // Load mappings from database
+        try {
+            const response = await fetch(`${API_BASE_URL}/system-mappings`);
+            if (response.ok) {
+                const data = await response.json();
+                currentMappings = data.mappings || [];
+            } else {
+                // Fall back to CONSTANTS if API fails
+                currentMappings = CONSTANTS.HEALTH_SYSTEM_MAPPINGS.map((m, idx) => ({
+                    id: idx + 1,
+                    keywords: m.keywords,
+                    system_name: m.system,
+                    sort_order: idx
+                }));
+            }
+        } catch (error) {
+            console.warn('Could not load mappings from database, using defaults:', error);
+            currentMappings = CONSTANTS.HEALTH_SYSTEM_MAPPINGS.map((m, idx) => ({
+                id: idx + 1,
+                keywords: m.keywords,
+                system_name: m.system,
+                sort_order: idx
+            }));
+        }
+        
+        renderMappingsTable();
+    };
+    
+    window.closeSettingsModal = function() {
+        document.getElementById('settingsModal').classList.add('hidden');
+    };
+    
+    function renderMappingsTable() {
+        const tbody = document.getElementById('mappingsTableBody');
+        if (!tbody) return;
+        
+        tbody.innerHTML = currentMappings.map((mapping, idx) => {
+            const keywordsStr = Array.isArray(mapping.keywords) 
+                ? mapping.keywords.join(', ') 
+                : mapping.keywords;
+            return `
+                <tr class="hover:bg-slate-50" data-idx="${idx}">
+                    <td class="p-2">
+                        <input type="text" value="${keywordsStr}" 
+                               onchange="updateMapping(${idx}, 'keywords', this.value)"
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                    </td>
+                    <td class="p-2">
+                        <input type="text" value="${mapping.system_name || mapping.system || ''}" 
+                               onchange="updateMapping(${idx}, 'system_name', this.value)"
+                               class="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                    </td>
+                    <td class="p-2 text-center">
+                        <button onclick="deleteMapping(${idx})" class="text-red-500 hover:text-red-700 p-1" title="Delete">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        lucide.createIcons();
+    }
+    
+    window.updateMapping = function(idx, field, value) {
+        if (currentMappings[idx]) {
+            if (field === 'keywords') {
+                // Convert comma-separated string to array
+                currentMappings[idx].keywords = value.split(',').map(k => k.trim()).filter(k => k);
+            } else {
+                currentMappings[idx][field] = value;
+            }
+        }
+    };
+    
+    window.deleteMapping = function(idx) {
+        currentMappings.splice(idx, 1);
+        renderMappingsTable();
+    };
+    
+    window.addMappingRow = function() {
+        currentMappings.push({
+            id: null,
+            keywords: [''],
+            system_name: '',
+            sort_order: currentMappings.length
+        });
+        renderMappingsTable();
+        
+        // Focus on the new row's keywords input
+        const tbody = document.getElementById('mappingsTableBody');
+        const lastRow = tbody.lastElementChild;
+        if (lastRow) {
+            const input = lastRow.querySelector('input');
+            if (input) input.focus();
+        }
+    };
+    
+    window.resetMappingsToDefaults = function() {
+        if (confirm('Reset all mappings to defaults? This will discard any changes.')) {
+            currentMappings = CONSTANTS.HEALTH_SYSTEM_MAPPINGS.map((m, idx) => ({
+                id: null,
+                keywords: [...m.keywords],
+                system_name: m.system,
+                sort_order: idx
+            }));
+            renderMappingsTable();
+            window.showToast('Mappings reset to defaults (not saved yet)', 'info');
+        }
+    };
+    
+    window.exportMappings = function() {
+        const data = {
+            version: '1.0',
+            exported: new Date().toISOString(),
+            mappings: currentMappings.map(m => ({
+                keywords: m.keywords,
+                system_name: m.system_name || m.system
+            }))
+        };
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `health-system-mappings-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+    
+    window.importMappings = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.mappings && Array.isArray(data.mappings)) {
+                    currentMappings = data.mappings.map((m, idx) => ({
+                        id: null,
+                        keywords: Array.isArray(m.keywords) ? m.keywords : [m.keywords],
+                        system_name: m.system_name || m.system || '',
+                        sort_order: idx
+                    }));
+                    renderMappingsTable();
+                    window.showToast(`Imported ${currentMappings.length} mappings (not saved yet)`, 'success');
+                } else {
+                    throw new Error('Invalid file format');
+                }
+            } catch (error) {
+                window.showToast('Error importing file: ' + error.message, 'error');
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // Reset file input
+    };
+    
+    window.saveSettings = async function() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/system-mappings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mappings: currentMappings })
+            });
+            
+            if (response.ok) {
+                // Update CONSTANTS with new mappings
+                CONSTANTS.HEALTH_SYSTEM_MAPPINGS = currentMappings.map(m => ({
+                    keywords: Array.isArray(m.keywords) ? m.keywords : [m.keywords],
+                    system: m.system_name || m.system
+                }));
+                
+                window.showToast('Settings saved successfully', 'success');
+                closeSettingsModal();
+                
+                // Refresh the data to apply new mappings
+                if (window.store && window.store.state.jobs.length > 0) {
+                    window.showToast('Refreshing data to apply new mappings...', 'info');
+                    await loadFromDatabase();
+                }
+            } else {
+                throw new Error('Failed to save');
+            }
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            window.showToast('Error saving settings: ' + error.message, 'error');
+        }
+    };
+    
+    // ==========================================
+    // END SETTINGS MODAL FUNCTIONS
+    // ==========================================
     
     window.loadHistoricalVersion = function() {
         const select = document.getElementById('historyVersionSelect');
