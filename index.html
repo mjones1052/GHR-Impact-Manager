@@ -3648,6 +3648,8 @@
                 body: JSON.stringify({ mappings: currentMappings })
             });
             
+            const responseData = await response.json();
+            
             if (response.ok) {
                 // Update CONSTANTS with new mappings
                 CONSTANTS.HEALTH_SYSTEM_MAPPINGS = currentMappings.map(m => ({
@@ -3664,7 +3666,7 @@
                     await window.loadDataFromDatabase();
                 }
             } else {
-                throw new Error('Failed to save');
+                throw new Error(responseData.error || `Server returned ${response.status}`);
             }
         } catch (error) {
             console.error('Error saving settings:', error);
