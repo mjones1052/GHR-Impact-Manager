@@ -478,34 +478,16 @@
                 if (data.clientPrincipal) {
                     console.log('Azure AD response:', JSON.stringify(data.clientPrincipal, null, 2));
                     
-                    const userId = data.clientPrincipal.userId || '';
-                    const userEmail = data.clientPrincipal.userDetails || '';
+                    // Just use the email address
+                    const userEmail = data.clientPrincipal.userDetails || 'Unknown User';
                     
-                    // Check for saved display name using Azure user ID
-                    const storageKey = `ghr_display_name_${userId}`;
-                    let userName = localStorage.getItem(storageKey);
-                    
-                    if (!userName) {
-                        // First time - prompt for display name
-                        const emailPrefix = userEmail.split('@')[0];
-                        userName = prompt(
-                            `Welcome! Please enter your display name for change tracking:\n\n(Your email: ${userEmail})`,
-                            ''
-                        );
-                        if (!userName || userName.trim() === '') {
-                            userName = emailPrefix || 'User';
-                        }
-                        // Save with user ID so it persists
-                        localStorage.setItem(storageKey, userName);
-                    }
-                    
-                    currentUserName = userName;
-                    localStorage.setItem('ghr_user_name', userName);
+                    currentUserName = userEmail;
+                    localStorage.setItem('ghr_user_name', userEmail);
                     azureUserLoaded = true;
-                    console.log('User loaded:', userName);
+                    console.log('User loaded:', userEmail);
                     
                     updateUserDisplay();
-                    return userName;
+                    return userEmail;
                 }
             }
         } catch (e) {
