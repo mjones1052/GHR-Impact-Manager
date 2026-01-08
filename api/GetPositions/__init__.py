@@ -36,8 +36,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 o.[Requisition_Reason] AS requisition_reason,
                 o.[Shift Diff] AS shift_diff,
                 o.[Min Hours] AS min_hours,
-                -- Get from old table if not in new table
-                COALESCE(b.Time_Type, o.[Shift Hours]) AS time_type,
+                o.[Start Date] AS open_start_date,
+                -- Get from old table if not in new table (cast decimal to nvarchar for COALESCE)
+                COALESCE(b.Time_Type, CAST(o.[Shift Hours] AS NVARCHAR(50))) AS time_type,
                 b.Start_Time AS start_time,
                 b.End_Time AS end_time,
                 b.Contract_Status AS status
