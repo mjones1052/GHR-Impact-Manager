@@ -1683,7 +1683,7 @@
             const marginCol = Object.keys(r).find(k => String(k).toLowerCase().includes('margin') || String(k).toLowerCase().includes('gp'));
             if (marginCol && r[marginCol]) {
               const m = parseFloat(r[marginCol]);
-              if (Number.isFinite(m)) existingJob.margin = m.toFixed(1);
+              if (Number.isFinite(m)) existingJob.margin = m % 1 === 0 ? m.toString() : m.toFixed(1);
             }
 
             if (n.nextStep && String(n.nextStep).startsWith('[')) {
@@ -1778,7 +1778,7 @@
             billRate: isNaN(parseFloat(n.billRate)) ? "0" : parseFloat(n.billRate).toFixed(0),
             shift: String(n.shift || 'N/A'), // Safe string
             shiftTime: String(n.shiftTime || ''), // Safe string
-            margin: calcMargin.toFixed(1),
+            margin: calcMargin % 1 === 0 ? calcMargin.toString() : calcMargin.toFixed(1),
             hiringManager: n.hiringManager || 'Unknown',
             status: n.status || 'Open',
             ghrSubs: 0, avSubs: 0, ghrDeclines: 0, avDeclines: 0,
@@ -3118,7 +3118,8 @@
                 const num = parseFloat(raw);
                 if (Number.isFinite(num)) {
                   const old = job.margin;
-                  job.margin = num.toFixed(1);
+                  // Only show decimal if not a whole number
+                  job.margin = num % 1 === 0 ? num.toString() : num.toFixed(1);
                   pushLog('Margin', `${old}% -> ${job.margin}%`, tag);
                   
                   // Save to database
