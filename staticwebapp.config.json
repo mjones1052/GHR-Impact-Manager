@@ -6,14 +6,31 @@
           "openIdIssuer": "https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0",
           "clientIdSettingName": "AAD_CLIENT_ID",
           "clientSecretSettingName": "AAD_CLIENT_SECRET"
-        },
-        "login": {
-          "loginParameters": ["scope=openid profile email"]
         }
       }
     }
   },
   "routes": [
+    {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/*.html",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/.auth/login/aad",
+      "allowedRoles": ["anonymous"]
+    },
+    {
+      "route": "/.auth/logout",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
     {
       "route": "/.auth/*",
       "allowedRoles": ["anonymous"]
@@ -21,14 +38,6 @@
     {
       "route": "/favicon.ico",
       "allowedRoles": ["anonymous"]
-    },
-    {
-      "route": "/api/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/*",
-      "allowedRoles": ["authenticated"]
     }
   ],
   "responseOverrides": {
