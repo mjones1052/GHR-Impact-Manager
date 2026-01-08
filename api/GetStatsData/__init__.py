@@ -10,7 +10,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             f"SERVER={os.environ['DB_HOST']};"
             f"DATABASE={os.environ['POSITIONS_DB']};"
             f"UID={os.environ['DB_USER']};"
-            f"PWD={os.environ['DB_PASSWORD']}"
+            f"PWD={os.environ['DB_PASSWORD']};"
             f"TrustServerCertificate=yes"
         )
         
