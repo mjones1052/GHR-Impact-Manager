@@ -2466,9 +2466,8 @@
         }).length;
         const ghrFillRate = activeCount > 0 ? Math.round((ghrActive / activeCount) * 100) : 0;
         
-        // Calculate total fill rate (all active contracts / total open positions)
-        const totalOpenPositions = s.jobs.length;
-        const totalFillRate = totalOpenPositions > 0 ? Math.round((activeCount / totalOpenPositions) * 100) : 0;
+        // Calculate overall fill rate (active contracts / (active + open positions))
+        const overallFillRate = (activeCount + total) > 0 ? Math.round((activeCount / (activeCount + total)) * 100) : 0;
 
         if (!total) {
           container.innerHTML = `
@@ -2502,7 +2501,7 @@
           { label: 'Active Sub Mix', val: `${ghrPct}% / ${avPct}%`, icon: 'users', color: 'blue', tooltip: 'GHR submissions % / Agency Vendor submissions %' },
           { label: 'Avg Margin', val: avgMargin + '%', icon: 'trending-up', color: 'green', tooltip: 'Average margin percentage across all open positions' },
           { label: 'Total Jobs', val: `${total} / <span class="text-red-500">${critical}</span>`, icon: 'alert-triangle', color: 'red', tooltip: 'Total open positions / Critical (aging) positions' },
-          { label: 'GHR / Total Fill / Active', val: `${ghrFillRate}% / ${totalFillRate}% / ${activeCount}`, icon: 'check-circle', color: 'emerald', tooltip: 'GHR fill rate % / Total fill rate % / Total active on contract' }
+          { label: 'GHR / Overall Fill / Active', val: `${ghrFillRate}% / ${overallFillRate}% / ${activeCount}`, icon: 'check-circle', color: 'emerald', tooltip: 'GHR fill rate % / Overall fill rate % / Total active on contract' }
         ];
 
         container.innerHTML = cards.map(c => `
