@@ -6,6 +6,9 @@
           "openIdIssuer": "https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0",
           "clientIdSettingName": "AAD_CLIENT_ID",
           "clientSecretSettingName": "AAD_CLIENT_SECRET"
+        },
+        "login": {
+          "loginParameters": ["scope=openid profile email"]
         }
       }
     }

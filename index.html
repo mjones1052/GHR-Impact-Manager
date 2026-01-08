@@ -1188,26 +1188,36 @@
         try { return JSON.parse(val); } catch { return fallback; }
       },
 
-      // Format timestamp to local time, fallback to EST if needed
+      // Format timestamp to local time (assumes stored as UTC)
       formatTimestamp(timestamp, includeDate = true) {
         if (!timestamp) return 'N/A';
         try {
-          const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+          let date;
+          
+          if (timestamp instanceof Date) {
+            date = timestamp;
+          } else {
+            // Parse the timestamp string
+            let dateStr = String(timestamp);
+            
+            // If it doesn't have timezone info, assume it's UTC
+            if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-', 10)) {
+              dateStr = dateStr + 'Z';
+            }
+            
+            date = new Date(dateStr);
+          }
+          
           if (isNaN(date.getTime())) return 'Invalid Date';
           
-          // Try local timezone first
+          // Format in user's local timezone
           const options = includeDate 
             ? { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }
             : { hour: '2-digit', minute: '2-digit', hour12: true };
           
-          try {
-            return date.toLocaleString('en-US', options);
-          } catch (e) {
-            // Fallback to EST if local timezone fails
-            options.timeZone = 'America/New_York';
-            return date.toLocaleString('en-US', options) + ' EST';
-          }
+          return date.toLocaleString('en-US', options);
         } catch (e) {
+          console.error('formatTimestamp error:', e, timestamp);
           return 'N/A';
         }
       },
