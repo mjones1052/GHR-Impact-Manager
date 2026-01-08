@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GHR Impact Manager</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
 
   <!-- Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -45,9 +46,8 @@
     .kpi-tooltip::after {
       content: attr(data-tooltip);
       position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: calc(100% + 8px);
+      right: 0;
       background: #1e293b;
       color: white;
       padding: 6px 10px;
@@ -59,23 +59,21 @@
       visibility: hidden;
       transition: opacity 0.15s, visibility 0.15s;
       pointer-events: none;
-      z-index: 50;
-      margin-bottom: 6px;
+      z-index: 9999;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
     .kpi-tooltip::before {
       content: '';
       position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
+      bottom: calc(100% + 2px);
+      right: 6px;
       border: 6px solid transparent;
       border-top-color: #1e293b;
       opacity: 0;
       visibility: hidden;
       transition: opacity 0.15s, visibility 0.15s;
       pointer-events: none;
-      z-index: 50;
+      z-index: 9999;
     }
     .kpi-tooltip:hover::after,
     .kpi-tooltip:hover::before {
@@ -2383,7 +2381,7 @@
         ];
 
         container.innerHTML = cards.map(c => `
-          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative">
             <div class="flex justify-between items-start mb-2">
               <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${c.label}</span>
               <span class="kpi-tooltip cursor-help" data-tooltip="${c.tooltip}"><i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i></span>
