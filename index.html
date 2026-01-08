@@ -844,7 +844,7 @@
             
             // Fetch health system mappings from database
             try {
-                const mappingsResponse = await fetch(`${API_BASE_URL}/GetSystemMappings`);
+                const mappingsResponse = await fetch(`${API_BASE_URL}/system-mappings`);
                 if (mappingsResponse.ok) {
                     const mappingsData = await mappingsResponse.json();
                     if (mappingsData.mappings && mappingsData.mappings.length > 0) {
@@ -3484,7 +3484,7 @@
         
         // Load mappings from database
         try {
-            const response = await fetch(`${API_BASE_URL}/GetSystemMappings`);
+            const response = await fetch(`${API_BASE_URL}/system-mappings`);
             if (response.ok) {
                 const data = await response.json();
                 currentMappings = data.mappings || [];
@@ -3642,7 +3642,7 @@
     
     window.saveSettings = async function() {
         try {
-            const response = await fetch(`${API_BASE_URL}/GetSystemMappings`, {
+            const response = await fetch(`${API_BASE_URL}/system-mappings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mappings: currentMappings })
