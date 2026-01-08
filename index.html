@@ -867,7 +867,12 @@
         
         // If we got a valid number, format it properly
         if (!isNaN(num) && num > 0) {
-            return `$${num.toFixed(2)}`;
+            // For large numbers (perm placement salaries), format with commas and no decimals
+            if (num >= 1000) {
+                return '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+            }
+            // For hourly rates, show 2 decimal places
+            return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         
         // If we can't parse it, just ensure single $ at the start
