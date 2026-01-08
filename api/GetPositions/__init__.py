@@ -7,11 +7,12 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         # Connect to positions database
         conn = pyodbc.connect(
-            f"DRIVER={{ODBC Driver 18 for SQL Server}};"
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
             f"SERVER={os.environ['DB_HOST']};"
             f"DATABASE={os.environ['POSITIONS_DB']};"
             f"UID={os.environ['DB_USER']};"
-            f"PWD={os.environ['DB_PASSWORD']}"
+            f"PWD={os.environ['DB_PASSWORD']};"
+            f"TrustServerCertificate=yes"
         )
         
         cursor = conn.cursor()
