@@ -2343,13 +2343,13 @@
 
         let html = `
           <div class="grid grid-cols-12 p-4 items-center hover:bg-slate-50 cursor-pointer group transition-colors" onclick="window.store.dispatch('TOGGLE_ROW','${job.id}')">
-            <div class="col-span-1 flex items-center gap-2">
+            <div class="col-span-1 flex items-center gap-1 overflow-hidden">
               <button onclick="event.stopPropagation(); window.store.dispatch('TOGGLE_HOT_JOB','${job.id}')" class="shrink-0 transition-transform hover:scale-110">
                 <i data-lucide="flame" class="w-4 h-4 ${isHot ? 'hot-job-active' : 'text-slate-300 hover:text-orange-400'}"></i>
               </button>
-              <span class="px-2 py-1 rounded text-xs font-bold ${colorClass}">${job.id}</span>
+              <span class="px-1.5 py-0.5 rounded text-xs font-bold ${colorClass} truncate">${job.id}</span>
             </div>
-            <div class="col-span-1 text-xs truncate font-medium text-slate-700" title="${job.program}">${job.program}</div>
+            <div class="col-span-1 text-xs font-medium text-slate-700 truncate overflow-hidden" title="${job.program}">${job.program}</div>
             <div class="col-span-3 pr-4 pl-2">
               <div class="text-[10px] uppercase font-bold text-slate-400 truncate" title="${job.healthSystem}${job.healthSystem && job.requisitionReason ? ' - ' : ''}${job.requisitionReason || (job.healthSystem ? '' : 'No Reason Given')}">${job.healthSystem}${job.healthSystem && job.requisitionReason ? ' - ' : ''}${job.requisitionReason || (job.healthSystem ? '' : 'No Reason Given')}</div>
               <div class="font-bold text-sm truncate">${job.facility}</div>
