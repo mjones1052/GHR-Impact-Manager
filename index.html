@@ -376,12 +376,12 @@
         <i data-lucide="move-horizontal" class="w-4 h-4"></i>
         <span>Swipe left/right to see all columns</span>
       </div>
-      <!-- Scrollable table wrapper for mobile -->
-      <div class="overflow-x-auto">
+      <!-- Single scroll container for header + body -->
+      <div class="overflow-x-auto flex-1 overflow-y-visible md:overflow-y-auto">
         <div class="min-w-[900px]">
           <div class="grid grid-cols-12 bg-slate-100 p-4 font-bold text-slate-600 border-b border-slate-200 text-sm uppercase tracking-wider sticky top-0 z-20 shrink-0" id="tableHeader">
             <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','id')">ID <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
-            <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','program')">Category <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
+            <div class="col-span-1 cursor-pointer hover:text-blue-600 flex items-center truncate" onclick="store.dispatch('SORT','program')">Category <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
             <div class="col-span-3 cursor-pointer hover:text-blue-600 flex items-center" onclick="store.dispatch('SORT','facility')">System / Facility / Specialty <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
             <div class="col-span-1 text-center cursor-pointer hover:text-blue-600 flex flex-col justify-center items-center" onclick="store.dispatch('SORT','numPositions')">
               <div class="flex items-center"># <i data-lucide="arrow-up-down" class="ml-1 w-3 h-3 opacity-50"></i></div>
@@ -400,11 +400,6 @@
               <div class="text-[9px] text-slate-400 font-normal">GHR / Agency</div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto flex-1 overflow-y-visible md:overflow-y-auto">
-        <div class="min-w-[900px]">
           <div id="jobsContainer" class="divide-y divide-slate-100 min-h-0 relative">
             <div class="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
               <i data-lucide="loader" class="w-12 h-12 mb-2 opacity-50 animate-spin"></i>
