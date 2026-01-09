@@ -185,42 +185,42 @@
     </div>
     
     <!-- Bottom row: Filters, Search, Buttons -->
-    <div class="flex flex-wrap items-end gap-2 md:gap-3" id="controlsArea">
-      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-32 min-h-[60px]" id="systemFilterContainer">
+    <div class="flex flex-wrap items-end gap-2 justify-end" id="controlsArea">
+      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-28 min-h-[58px]" id="systemFilterContainer">
         <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">System</label>
         <div class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-400">Loading...</div>
       </div>
-      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-32 min-h-[60px]" id="facilityFilterContainer">
+      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-28 min-h-[58px]" id="facilityFilterContainer">
         <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Facility</label>
         <div class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-400">Loading...</div>
       </div>
-      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-32 min-h-[60px]" id="categoryFilterContainer">
+      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-28 min-h-[58px]" id="categoryFilterContainer">
         <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Category</label>
         <div class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-400">Loading...</div>
       </div>
-      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-32 min-h-[60px]" id="specialtyFilterContainer">
+      <div class="multi-select-container relative w-[calc(50%-4px)] sm:w-28 min-h-[58px]" id="specialtyFilterContainer">
         <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Specialty</label>
         <div class="w-full bg-white border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-400">Loading...</div>
       </div>
 
-      <div class="relative w-[calc(50%-4px)] sm:w-28">
-        <label class="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Search ID</label>
+      <div class="relative w-[calc(50%-4px)] sm:w-24">
+        <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Search ID</label>
         <div class="relative">
           <input type="text" placeholder="Job ID..." 
-                 class="w-full bg-white border border-slate-300 rounded-md pl-7 pr-2 py-1.5 sm:py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                 class="w-full bg-white border border-slate-300 rounded-md pl-7 pr-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
                  oninput="store.dispatch('SET_SEARCH', this.value)">
-          <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5 sm:top-3"></i>
+          <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-2.5 top-3"></i>
         </div>
       </div>
 
-      <div class="relative w-[calc(50%-4px)] sm:w-28">
-        <label class="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Days Age</label>
+      <div class="relative w-[calc(50%-4px)] sm:w-24">
+        <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Days Age</label>
         <div class="flex gap-1">
           <input type="number" id="minAge" placeholder="Min"
-                 class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-1.5 sm:py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                 class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
                  oninput="store.dispatch('SET_AGE_RANGE')">
           <input type="number" id="maxAge" placeholder="Max"
-                 class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-1.5 sm:py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                 class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
                  oninput="store.dispatch('SET_AGE_RANGE')">
         </div>
       </div>
@@ -2044,7 +2044,7 @@
 
       getFilteredJobs(s) {
         return s.jobs.filter(j => {
-          const sysMatch = s.filterSelection.systems.size === 0 || s.filterSelection.systems.has(j.system);
+          const sysMatch = s.filterSelection.systems.size === 0 || s.filterSelection.systems.has(j.healthSystem);
           const facMatch = s.filterSelection.facilities.size === 0 || s.filterSelection.facilities.has(j.facility);
           const specMatch = s.filterSelection.specialties.size === 0 || s.filterSelection.specialties.has(Utils.cleanFilterText(j.specialty));
           const catMatch = s.filterSelection.categories.size === 0 || Array.from(s.filterSelection.categories).some(cv => Utils.checkCategoryMatch(j.program, cv));
@@ -2781,7 +2781,8 @@
               s.jobs = payload.jobs || [];
               s.statsData = payload.statsData || { onAssignment: [], upcoming: [] };
 
-              s.filters.systems = new Set(s.jobs.map(j => j.system).filter(Boolean));
+              // Use healthSystem (mapped value) for system filter
+              s.filters.systems = new Set(s.jobs.map(j => j.healthSystem).filter(Boolean));
               s.filters.facilities = new Set(s.jobs.map(j => j.facility).filter(Boolean));
               s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
               s.filters.specialties = new Set(s.jobs.map(j => j.specialty).filter(Boolean));
