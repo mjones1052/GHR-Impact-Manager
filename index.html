@@ -2800,6 +2800,13 @@
             }
 
             case 'REFRESH_UI': {
+              // Populate filters from current jobs data
+              s.filters.systems = new Set(s.jobs.map(j => j.healthSystem).filter(Boolean));
+              s.filters.facilities = new Set(s.jobs.map(j => j.facility).filter(Boolean));
+              s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
+              s.filters.specialties = new Set(s.jobs.map(j => j.specialty).filter(Boolean));
+              
+              View.initFilters();
               View.viewToggle();
               View.main();
               break;
