@@ -8,6 +8,15 @@
 
   <!-- Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { corePlugins: { preflight: true } }</script>
+  <script>
+    // Suppress Tailwind CDN production warning
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+      if (args[0]?.includes?.('cdn.tailwindcss.com')) return;
+      originalWarn.apply(console, args);
+    };
+  </script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -83,7 +92,7 @@
   </style>
 </head>
 
-<body class="bg-slate-50 text-slate-800 min-h-screen w-full p-6 flex flex-col overflow-x-hidden overflow-y-auto md:h-screen md:overflow-hidden">
+<body class="bg-slate-50 text-slate-800 min-h-screen w-full p-2 sm:p-6 flex flex-col overflow-x-hidden overflow-y-auto md:h-screen md:overflow-hidden">
 
   <!-- TOAST CONTAINER -->
   <div id="toastContainer" class="fixed top-4 right-4 z-[60] flex flex-col gap-2"></div>
@@ -147,28 +156,28 @@
   <!-- HEADER -->
   <header class="mb-4 shrink-0">
     <!-- Top row: Title and User -->
-    <div class="flex justify-between items-start mb-2">
+    <div class="flex flex-col sm:flex-row justify-between items-start gap-2 mb-2">
       <div>
-        <h1 class="text-3xl font-bold text-slate-900 flex items-center gap-3">
-          <i data-lucide="activity" class="text-blue-600 w-8 h-8"></i>
+        <h1 class="text-xl sm:text-3xl font-bold text-slate-900 flex items-center gap-2 sm:gap-3">
+          <i data-lucide="activity" class="text-blue-600 w-6 h-6 sm:w-8 sm:h-8"></i>
           GHR Impact Manager
         </h1>
-        <p class="text-slate-500 mt-1">High-Performance Optimization Build</p>
+        <p class="text-slate-500 text-xs sm:text-base mt-1 hidden sm:block">High-Performance Optimization Build</p>
       </div>
       
       <!-- User Display & Logout - Top Right -->
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
         <button onclick="openSettingsModal()" 
-                class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 sm:px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                 title="Settings">
           <i data-lucide="settings" class="w-4 h-4"></i>
         </button>
-        <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-md px-3 h-[38px] shadow-sm">
+        <div class="flex items-center gap-1 sm:gap-2 bg-white border border-slate-200 rounded-md px-2 sm:px-3 h-[32px] sm:h-[38px] shadow-sm">
           <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
-          <span id="currentUserDisplay" class="text-sm font-medium text-slate-700 max-w-[200px] truncate">Loading...</span>
+          <span id="currentUserDisplay" class="text-xs sm:text-sm font-medium text-slate-700 max-w-[100px] sm:max-w-[200px] truncate">Loading...</span>
         </div>
         <button onclick="logout()" 
-                class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 sm:px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                 title="Sign out">
           <i data-lucide="log-out" class="w-4 h-4"></i>
         </button>
@@ -176,62 +185,62 @@
     </div>
     
     <!-- Bottom row: Filters, Search, Buttons -->
-    <div class="flex flex-wrap items-end gap-2 md:gap-3 justify-between" id="controlsArea">
-      <div class="flex flex-wrap items-end gap-2 md:gap-3">
-        <div class="multi-select-container relative w-[calc(50%-4px)] md:w-40" id="systemFilterContainer"></div>
-        <div class="multi-select-container relative w-[calc(50%-4px)] md:w-40" id="facilityFilterContainer"></div>
-        <div class="multi-select-container relative w-[calc(50%-4px)] md:w-40" id="categoryFilterContainer"></div>
-        <div class="multi-select-container relative w-[calc(50%-4px)] md:w-40" id="specialtyFilterContainer"></div>
+    <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-2 md:gap-3 justify-between" id="controlsArea">
+      <div class="flex flex-wrap items-end gap-1 sm:gap-2 md:gap-3">
+        <div class="multi-select-container relative w-[calc(50%-2px)] sm:w-[calc(50%-4px)] md:w-40" id="systemFilterContainer"></div>
+        <div class="multi-select-container relative w-[calc(50%-2px)] sm:w-[calc(50%-4px)] md:w-40" id="facilityFilterContainer"></div>
+        <div class="multi-select-container relative w-[calc(50%-2px)] sm:w-[calc(50%-4px)] md:w-40" id="categoryFilterContainer"></div>
+        <div class="multi-select-container relative w-[calc(50%-2px)] sm:w-[calc(50%-4px)] md:w-40" id="specialtyFilterContainer"></div>
       </div>
 
-      <div class="flex flex-wrap items-end gap-2 md:gap-3">
-        <div class="relative w-[calc(50%-4px)] md:w-32">
-          <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Search ID</label>
+      <div class="flex flex-wrap items-end gap-1 sm:gap-2 md:gap-3">
+        <div class="relative w-[calc(50%-2px)] sm:w-[calc(50%-4px)] md:w-32">
+          <label class="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Search ID</label>
           <div class="relative">
             <input type="text" placeholder="Job ID..." 
-                   class="w-full bg-white border border-slate-300 rounded-md pl-7 pr-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                   class="w-full bg-white border border-slate-300 rounded-md pl-7 pr-2 py-1.5 sm:py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
                    oninput="store.dispatch('SET_SEARCH', this.value)">
-            <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-2.5 top-3"></i>
+            <i data-lucide="search" class="w-3 h-3 text-slate-400 absolute left-2.5 top-2.5 sm:top-3"></i>
           </div>
         </div>
 
-        <div class="relative w-[calc(50%-4px)] md:w-32">
-          <label class="block text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Days Age Range</label>
+        <div class="relative w-[calc(50%-2px)] sm:w-[calc(50%-4px)] md:w-32">
+          <label class="block text-[10px] sm:text-xs font-bold text-slate-500 mb-1 ml-1 uppercase tracking-wider">Days Age</label>
           <div class="flex gap-1">
             <input type="number" id="minAge" placeholder="Min"
-                   class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                   class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-1.5 sm:py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
                    oninput="store.dispatch('SET_AGE_RANGE')">
             <input type="number" id="maxAge" placeholder="Max"
-                   class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
+                   class="w-1/2 bg-white border border-slate-300 rounded-md px-2 py-1.5 sm:py-2 text-sm focus:border-blue-500 outline-none shadow-sm"
                    oninput="store.dispatch('SET_AGE_RANGE')">
           </div>
         </div>
         
         <!-- Buttons -->
-        <div class="flex gap-2 items-center">
+        <div class="flex gap-1 sm:gap-2 items-center flex-wrap">
           <button id="saveBtn"
-                  class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                  class="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   onclick="exportData()" title="Download updated file">
-            <i data-lucide="save" class="w-4 h-4"></i> Save
+            <i data-lucide="save" class="w-4 h-4"></i> <span class="hidden sm:inline">Save</span>
           </button>
           
-          <button class="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+          <button class="flex items-center gap-1 sm:gap-2 bg-orange-600 hover:bg-orange-700 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   onclick="store.dispatch('GENERATE_HOT_JOBS_EMAIL')" title="AI Hot Job Summary">
               <i data-lucide="flame" class="w-4 h-4"></i>
           </button>
-          <button class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+          <button class="flex items-center gap-1 sm:gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   onclick="store.dispatch('GENERATE_SUMMARY')" title="AI Impact Call Summary">
               <i data-lucide="file-text" class="w-4 h-4"></i>
           </button>
 
           <button id="privacyBtn"
-                  class="flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                  class="flex items-center gap-1 sm:gap-2 bg-slate-700 hover:bg-slate-800 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   onclick="store.dispatch('TOGGLE_PRIVACY')" title="Redact Vendor Info">
             <i data-lucide="eye" id="privacyIcon" class="w-4 h-4"></i>
           </button>
           
           <button onclick="openHistoryModal()" 
-                  class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 rounded-md shadow-sm text-sm font-medium transition-colors h-[38px]"
+                  class="flex items-center gap-1 sm:gap-2 bg-purple-600 hover:bg-purple-700 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   title="View change history">
             <i data-lucide="history" class="w-4 h-4"></i>
           </button>
@@ -342,7 +351,7 @@
     </div>
   </div>
 
-  <div id="kpiContainer" class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6 shrink-0 min-h-[100px]"></div>
+  <div id="kpiContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-6 shrink-0 min-h-[80px] sm:min-h-[100px]"></div>
 
   <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4 shrink-0">
     <div id="legendContainer" class="flex flex-wrap items-center gap-4 text-xs font-medium text-slate-600 bg-white p-3 rounded-md border border-slate-200 inline-flex shadow-sm min-h-[38px] flex-1"></div>
@@ -501,38 +510,8 @@
   </div>
 
   <script>
-    // ============================================================
-    // Stability upgrades applied (the stuff causing your errors)
-    // 1) More forgiving header matching (fixes Position ID vs Job ID)
-    // 2) Clear error messages that show what headers it actually saw
-    // 3) Guardrails so failed imports do not cascade into null errors
-    // 4) Small helper functions reduce copy paste and make reordering safe
-    // 5) Centralized parsing so weird Excel types do not break the app
-    // ============================================================
-
     const $ = (id) => document.getElementById(id);
 
-    // ============================================================================
-    // NOTE: Database Integration
-    // ============================================================================
-    // When levers are toggled, changes are automatically saved to the database
-    // via the recordChange() function. The app loads data from the database
-    // using the "Load from Database" button.
-    //
-    // To fully integrate:
-    // 1. Deploy Azure Functions (see AZURE_COMPLETE_HOSTING.md)
-    // 2. Update API_BASE_URL to your Azure Function App URL
-    // 3. Use "Load from Database" button to load live data
-    // 4. All lever changes automatically sync to database
-    // ============================================================================
-
-    // ============================================================================
-    // DATABASE & API CONFIGURATION FOR AZURE
-    // ============================================================================
-    
-    // API Configuration - Update this to your Azure Function App URL
-    // For Azure Static Web Apps: use '/api' (it auto-routes to Azure Functions)
-    // For separate Function App: use 'https://your-function-app.azurewebsites.net/api'
     const API_BASE_URL = '/api';
     
     const DB_CONFIG = {
@@ -623,9 +602,7 @@
 
 
 
-    // ==========================
     // 0. TOAST NOTIFICATION SYSTEM
-    // ==========================
     window.showToast = (msg, type = 'error') => {
       const container = $('toastContainer');
       if (!container) return;
@@ -645,16 +622,9 @@
       }, 3500);
     };
 
-    // ==========================
     // 1. CONFIG & CONSTANTS
-    // ==========================
     const CONSTANTS = {
-      // ===========================================
-      // HEALTH SYSTEM MAPPING
-      // Update this section to add/modify health system mappings
-      // Keywords are matched case-insensitively against facility names
-      // First match wins - order matters!
-      // ===========================================
+      // Health System Mappings (editable in Settings)
       HEALTH_SYSTEM_MAPPINGS: [
         { keywords: ['capital', 'hopewell', 'deborah'], system: 'Capital Health' },
         { keywords: ['cooper', 'cape'], system: 'Cooper' },
@@ -671,7 +641,6 @@
         { keywords: ['temple', 'jeanes'], system: 'Temple Health' },
         { keywords: ['trinity', 'mercy', 'st. mary', 'nazareth', 'st. francis'], system: 'Trinity Health' },
       ],
-      // ===========================================
       
       TEAM_MEMBERS: [
         { name: "Alyssa Comita", email: "acomita@ghrhealthcare.com" },
@@ -762,13 +731,9 @@
       ALLIED_KEYWORDS: ['allied', 'tech', 'therapist', 'therapy', 'rad', 'sonographer', 'phlebotomy', 'assistant', 'technologist']
     };
 
-    // ==========================
     // 2. UTILITIES
-    // ==========================
 
-    // ============================================================================
     // DATABASE FUNCTIONS
-    // ============================================================================
     
     /**
      * Generate test data for demo/testing purposes
@@ -1511,9 +1476,7 @@
       }
     };
 
-    // ==========================
     // 3. GLOBAL EXPORTS
-    // ==========================
     window.copySummary = async (btn) => {
       const text = $('summaryText')?.value || '';
       try { await navigator.clipboard.writeText(text); }
@@ -1567,9 +1530,7 @@
       }, 50);
     };
 
-    // ==========================
     // 4. DATA PROCESSING
-    // ==========================
     const DataProcessor = {
       // Normalize header names so "Position ID" and "PositionID" and "position id" match
       normalizeHeader(h) {
@@ -1912,9 +1873,7 @@
       }
     };
 
-    // ==========================
     // 5. VIEW / RENDER
-    // ==========================
     const View = {
       initFilters() {
         const s = window.store.state;
@@ -2662,12 +2621,12 @@
         ];
 
         container.innerHTML = cards.map(c => `
-          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative">
-            <div class="flex justify-between items-start mb-2">
-              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">${c.label}</span>
-              <span class="kpi-tooltip cursor-help" data-tooltip="${c.tooltip}"><i data-lucide="${c.icon}" class="w-4 h-4 text-${c.color}-500"></i></span>
+          <div class="bg-white p-2 sm:p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative">
+            <div class="flex justify-between items-start mb-1 sm:mb-2">
+              <span class="text-[9px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider leading-tight">${c.label}</span>
+              <span class="kpi-tooltip cursor-help" data-tooltip="${c.tooltip}"><i data-lucide="${c.icon}" class="w-3 h-3 sm:w-4 sm:h-4 text-${c.color}-500"></i></span>
             </div>
-            <div class="text-2xl font-bold text-slate-800">${c.val}</div>
+            <div class="text-base sm:text-2xl font-bold text-slate-800">${c.val}</div>
           </div>
         `).join('');
 
@@ -2791,9 +2750,7 @@
       }
     };
 
-    // ==========================
     // 6. STORE
-    // ==========================
     window.store = {
       state: {
         jobs: [],
@@ -3391,9 +3348,7 @@
       }
     };
 
-    // ==========================
     // 7. EVENT LISTENERS
-    // ==========================
     document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
 
@@ -3417,9 +3372,7 @@
     window.View = View;
     window.Utils = Utils;
     
-    // ============================================================================
     // HISTORY MODAL FUNCTIONS
-    // ============================================================================
     
     let currentHistoryVersion = null;
     
@@ -3482,9 +3435,7 @@
         currentHistoryVersion = null;
     };
     
-    // ==========================================
     // SETTINGS MODAL FUNCTIONS
-    // ==========================================
     
     let currentMappings = [];
     
@@ -3684,9 +3635,7 @@
         }
     };
     
-    // ==========================================
     // END SETTINGS MODAL FUNCTIONS
-    // ==========================================
     
     window.loadHistoricalVersion = function() {
         const select = document.getElementById('historyVersionSelect');
