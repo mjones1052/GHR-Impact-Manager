@@ -893,6 +893,8 @@
                             r.endDate = r.endDate ? new Date(r.endDate) : null;
                             // Normalize Agency field name (API returns 'Agency', code expects 'agency')
                             if (r.Agency && !r.agency) r.agency = r.Agency;
+                            // Apply health system mapping
+                            r.healthSystem = Utils.getHealthSystem(r.facility, r.system);
                         });
                     }
                     
@@ -902,6 +904,8 @@
                             r.startDate = r.startDate ? new Date(r.startDate) : null;
                             // Normalize Agency field name
                             if (r.Agency && !r.agency) r.agency = r.Agency;
+                            // Apply health system mapping
+                            r.healthSystem = Utils.getHealthSystem(r.facility, r.system);
                         });
                     }
                     
@@ -2572,7 +2576,7 @@
 
         const now = new Date();
         const activeContractsFiltered = (s.statsData.onAssignment || []).filter(r => {
-          const sysMatch = s.filterSelection.systems.size === 0 || (r.system && s.filterSelection.systems.has(r.system));
+          const sysMatch = s.filterSelection.systems.size === 0 || (r.healthSystem && s.filterSelection.systems.has(r.healthSystem));
           const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
           const isActive = r.startDate && r.startDate <= now && (!r.endDate || r.endDate >= now);
           return sysMatch && facMatch && isActive;
@@ -2670,7 +2674,7 @@
 
         const metrics = buckets.map(bucket => {
           const activeAssignments = (s.statsData.onAssignment || []).filter(r => {
-            const sysMatch = s.filterSelection.systems.size === 0 || (r.system && s.filterSelection.systems.has(r.system));
+            const sysMatch = s.filterSelection.systems.size === 0 || (r.healthSystem && s.filterSelection.systems.has(r.healthSystem));
             const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
             const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
             if (!(sysMatch && facMatch && specMatch)) return false;
@@ -2684,7 +2688,7 @@
           const fulfillment = totalOnAssg > 0 ? ((ghrCount / totalOnAssg) * 100).toFixed(1) : 0;
 
           const filteredUpcoming = (s.statsData.upcoming || []).filter(r => {
-            const sysMatch = s.filterSelection.systems.size === 0 || (r.system && s.filterSelection.systems.has(r.system));
+            const sysMatch = s.filterSelection.systems.size === 0 || (r.healthSystem && s.filterSelection.systems.has(r.healthSystem));
             const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
             const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
             return sysMatch && facMatch && specMatch;
