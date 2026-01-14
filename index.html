@@ -246,7 +246,7 @@
           <button id="privacyBtn"
                   class="flex items-center gap-1 sm:gap-2 bg-slate-700 hover:bg-slate-800 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   onclick="store.dispatch('TOGGLE_PRIVACY')" title="Redact Vendor Info">
-            <i data-lucide="eye" id="privacyIcon" class="w-4 h-4"></i>
+            <i data-lucide="eye-off" id="privacyIcon" class="w-4 h-4 text-red-400"></i>
           </button>
           
           <button onclick="openHistoryModal()" 
@@ -2774,7 +2774,7 @@
         modal: { open: false, type: null, jobId: null, key: null, val: null, candidateIndex: null },
         sessionLog: [],
         filename: 'Updated_Positions',
-        redactMode: false
+        redactMode: true
       },
 
       dispatch(action, payload) {
@@ -2868,26 +2868,49 @@
             }
 
             case 'TOGGLE_PRIVACY': {
-              const code = prompt("Enter Admin Code to Toggle Privacy Mode:");
-              if (code === '2026') {
-                  s.redactMode = !s.redactMode;
-                  const btn = $('privacyIcon');
-                  if (btn) {
-                      if (s.redactMode) {
-                          btn.setAttribute('data-lucide', 'eye-off');
-                          btn.classList.add('text-red-400');
-                          window.showToast("Privacy Mode Enabled", "success");
-                      } else {
-                          btn.setAttribute('data-lucide', 'eye');
-                          btn.classList.remove('text-red-400');
+              // If redaction is ON, require password to turn OFF
+              if (s.redactMode) {
+                  const code = prompt("Enter Admin Code to Disable Privacy Mode:");
+                  if (!code) break;
+                  
+                  // Validate password via API
+                  fetch(`${API_BASE_URL}/validate-password`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ password: code })
+                  })
+                  .then(res => res.json())
+                  .then(data => {
+                      if (data.valid) {
+                          s.redactMode = false;
+                          const btn = $('privacyIcon');
+                          if (btn) {
+                              btn.setAttribute('data-lucide', 'eye');
+                              btn.classList.remove('text-red-400');
+                              lucide.createIcons();
+                          }
                           window.showToast("Privacy Mode Disabled", "info");
+                          View.main();
+                      } else {
+                          window.showToast("Incorrect Code", "error");
                       }
-                      lucide.createIcons();
-                  }
-                  View.main(); // Re-render to update names
-              } else {
-                  window.showToast("Incorrect Code", "error");
+                  })
+                  .catch(() => {
+                      window.showToast("Error validating code", "error");
+                  });
+                  break;
               }
+              
+              // Turning ON doesn't require password
+              s.redactMode = true;
+              const btn = $('privacyIcon');
+              if (btn) {
+                  btn.setAttribute('data-lucide', 'eye-off');
+                  btn.classList.add('text-red-400');
+                  lucide.createIcons();
+              }
+              window.showToast("Privacy Mode Enabled", "success");
+              View.main();
               break;
             }
 
