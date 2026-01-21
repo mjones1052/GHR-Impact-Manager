@@ -1983,8 +1983,10 @@
         const validSystems = s.filterSelection.systems;
         const newFacilities = new Set();
         s.jobs.forEach(item => {
-          const sys = item.system;
-          if (validSystems.size === 0 || validSystems.has(sys)) newFacilities.add(item.facility);
+          // Use healthSystem (mapped value) to match system filter
+          if (validSystems.size === 0 || validSystems.has(item.healthSystem)) {
+            if (item.facility) newFacilities.add(item.facility);
+          }
         });
         View.renderDropdown('facilityFilterContainer', 'facilities', newFacilities, false);
         View.updateFilterUI('facilities');
@@ -2468,9 +2470,10 @@
                       const subDateStr = c.date ? c.date.toLocaleDateString() : 'N/A';
                       
                       const agLower = (c.agency || '').toLowerCase();
-                      const isInternal = agLower.includes('ghr') || agLower.includes('planet');
+                      // GHR or Planet Healthcare = internal, but not "The Planet Group"
                       const isGHR = agLower.includes('ghr');
-                      const isPlanet = agLower.includes('planet');
+                      const isPlanetHealthcare = agLower.includes('planet healthcare');
+                      const isInternal = isGHR || isPlanetHealthcare;
 
                       // Redaction Logic: Only redact if NOT internal/partner
                       const displayName = (s.redactMode && !isInternal) ? Utils.redactName(c.name) : c.name;
@@ -2485,7 +2488,7 @@
                           rowBgClass = 'bg-blue-50/40 hover:bg-blue-50 border-blue-100';
                           nameColorClass = 'text-blue-900';
                           badgeClass = 'text-blue-500 font-bold';
-                      } else if (isPlanet) {
+                      } else if (isPlanetHealthcare) {
                           rowBgClass = 'bg-purple-50/40 hover:bg-purple-50 border-purple-100';
                           nameColorClass = 'text-purple-900';
                           badgeClass = 'text-purple-500 font-bold';
@@ -2587,7 +2590,7 @@
         // Calculate GHR fill rate (GHR agencies / total active)
         const ghrActive = activeContractsFiltered.filter(r => {
           const agencyLower = (r.agency || '').toLowerCase();
-          return agencyLower.includes('ghr') || agencyLower.includes('planet');
+          return agencyLower.includes('ghr') || agencyLower.includes('planet healthcare');
         }).length;
         const ghrFillRate = activeCount > 0 ? Math.round((ghrActive / activeCount) * 100) : 0;
         
@@ -2682,7 +2685,10 @@
           });
 
           const totalOnAssg = activeAssignments.length;
-          const ghrGroup = activeAssignments.filter(r => String(r.agency || '').toLowerCase().includes('ghr') || String(r.agency || '').toLowerCase().includes('planet'));
+          const ghrGroup = activeAssignments.filter(r => {
+            const agLower = String(r.agency || '').toLowerCase();
+            return agLower.includes('ghr') || agLower.includes('planet healthcare');
+          });
           const ghrCount = ghrGroup.length;
           const agencyCount = totalOnAssg - ghrCount;
           const fulfillment = totalOnAssg > 0 ? ((ghrCount / totalOnAssg) * 100).toFixed(1) : 0;
@@ -3297,7 +3303,7 @@
 
                           activeSubs.forEach(c => {
                               const agLower = (c.agency || '').toLowerCase();
-                              const isInternal = agLower.includes('ghr') || agLower.includes('planet');
+                              const isInternal = agLower.includes('ghr') || agLower.includes('planet healthcare');
                               const days = c.date ? Utils.calcDays(c.date) : '?';
                               
                               // Redaction: Only redact non-internal agencies if privacy mode is on
