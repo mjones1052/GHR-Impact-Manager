@@ -1041,6 +1041,7 @@
                 dateAdded: Utils.toDateOrNull(row.date_added || row.created_date),
                 daysPast: 0,
                 billRate: cleanBillRate(row.bill_rate || ''),
+                billRateEstimated: row.bill_rate_estimated === 1 || row.bill_rate_estimated === true,
                 shift: String(row.time_type || row.shift_hours || row.shift || 'N/A'),
                 shiftTime: row.start_time && row.end_time ? calculateShiftLength(row.start_time, row.end_time) : String(row.shift_time || ''),
                 startTime: String(row.start_time || ''),
@@ -2379,7 +2380,7 @@
               </div>
             </div>
             <div class="col-span-1 text-center font-bold text-slate-700 text-sm">${job.numPositions || 1}</div>
-            <div class="col-span-1 text-center font-bold text-slate-700 text-xs">${job.billRate}</div>
+            <div class="col-span-1 text-center font-bold text-xs ${job.billRateEstimated ? 'text-amber-600' : 'text-slate-700'}" title="${job.billRateEstimated ? 'Estimated (using suggested/max rate)' : ''}">${job.billRate}${job.billRateEstimated ? '*' : ''}</div>
             <div class="col-span-1 text-center">
               <span class="inline-flex font-bold text-xs ${bubbleClasses} ${bubbleText} rounded-full w-8 h-8 items-center justify-center mx-auto">${job.daysPast}</span>
             </div>

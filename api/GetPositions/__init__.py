@@ -88,12 +88,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 'VNDLY' AS source_system,
                 RTRIM(LTRIM([Job Id])) AS position_id,
                 [Job Category] AS program,
-                [Facility] AS facility,
+                COALESCE([Facility], [Health System]) AS facility,
                 [Job Title] AS specialty,
                 [Job Approval Date] AS date_added,
                 [Organization Unit (Job)] AS unit,
                 [Charge Code - Cost Center] AS cost_center,
-                [Bill Rate] AS bill_rate,
+                COALESCE([Bill Rate], [Suggested Bill Rate], [Max Bill Rate]) AS bill_rate,
+                CASE 
+                    WHEN [Bill Rate] IS NOT NULL THEN 0
+                    ELSE 1
+                END AS bill_rate_estimated,
                 [Standard Hours Per Week] AS shift_hours,
                 [Shift Time Type] AS shift_time,
                 [Resource Manager (Job)] AS hiring_manager,
