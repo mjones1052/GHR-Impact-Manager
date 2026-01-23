@@ -16,10 +16,16 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         )
         
         cursor = conn.cursor()
+        positions = []
+        b4_position_ids = []
+        vndly_position_ids = []
         
-        # Get open positions from B4HEALTHOPENORDER, joining to B4HealthOrder for additional fields
+        # ============================================================
+        # PART 1: Get B4Health Open Positions
+        # ============================================================
         cursor.execute('''
             SELECT 
+                'B4' AS source_system,
                 RTRIM(LTRIM(o.[Position ID])) AS position_id,
                 o.[Program] AS program,
                 o.[Facility Name] AS facility,
@@ -37,7 +43,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 o.[Shift Diff] AS shift_diff,
                 o.[Min Hours] AS min_hours,
                 o.[Start Date] AS open_start_date,
-                -- Get from old table if not in new table (cast decimal to nvarchar for COALESCE)
                 COALESCE(b.Time_Type, CAST(o.[Shift Hours] AS NVARCHAR(50))) AS time_type,
                 b.Start_Time AS start_time,
                 b.End_Time AS end_time,
@@ -50,8 +55,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         ''')
         
         columns = [column[0] for column in cursor.description]
-        positions = []
-        position_ids = []
         
         for row in cursor.fetchall():
             row_dict = dict(zip(columns, row))
@@ -75,11 +78,69 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             
             positions.append(row_dict)
             if row_dict.get('position_id'):
-                position_ids.append(row_dict['position_id'])
+                b4_position_ids.append(row_dict['position_id'])
         
-        # Get submissions for these positions
-        if position_ids:
-            placeholders = ','.join(['?' for _ in position_ids])
+        # ============================================================
+        # PART 2: Get VNDLY Open Positions
+        # ============================================================
+        cursor.execute('''
+            SELECT 
+                'VNDLY' AS source_system,
+                RTRIM(LTRIM([Job Id])) AS position_id,
+                [Job Category] AS program,
+                [Facility] AS facility,
+                [Job Title] AS specialty,
+                [Job Approval Date] AS date_added,
+                [Organization Unit (Job)] AS unit,
+                [Charge Code - Cost Center] AS cost_center,
+                [Bill Rate] AS bill_rate,
+                [Standard Hours Per Week] AS shift_hours,
+                NULL AS shift_time,
+                [Resource Manager (Job)] AS hiring_manager,
+                NULL AS num_submissions,
+                [Open Positions] AS num_positions,
+                NULL AS requisition_reason,
+                NULL AS shift_diff,
+                NULL AS min_hours,
+                [Start Date] AS open_start_date,
+                [Job Type] AS time_type,
+                NULL AS start_time,
+                NULL AS end_time,
+                [Job Status] AS status,
+                [Health System] AS health_system
+            FROM dbo.STAGING_VNDLY_JOBS
+            WHERE [Job Status] = 'Active'
+            ORDER BY [Job Approval Date] DESC
+        ''')
+        
+        columns = [column[0] for column in cursor.description]
+        
+        for row in cursor.fetchall():
+            row_dict = dict(zip(columns, row))
+            
+            # Convert dates to ISO format
+            if row_dict.get('date_added'):
+                row_dict['date_added'] = row_dict['date_added'].isoformat() if hasattr(row_dict['date_added'], 'isoformat') else str(row_dict['date_added'])
+            
+            # Initialize submission counts
+            row_dict['ghrSubs'] = 0
+            row_dict['avSubs'] = 0
+            row_dict['ghrDeclines'] = 0
+            row_dict['avDeclines'] = 0
+            row_dict['candidates'] = []
+            
+            positions.append(row_dict)
+            if row_dict.get('position_id'):
+                vndly_position_ids.append(row_dict['position_id'])
+        
+        # Create lookup dict for positions
+        pos_lookup = {p['position_id']: p for p in positions}
+        
+        # ============================================================
+        # PART 3: Get B4Health Submissions
+        # ============================================================
+        if b4_position_ids:
+            placeholders = ','.join(['?' for _ in b4_position_ids])
             cursor.execute(f'''
                 SELECT 
                     RTRIM(LTRIM(Contract_Assignment_ID)) AS Contract_Assignment_ID,
@@ -97,12 +158,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     IsActive
                 FROM dhc.B4Health_Contract_Submissions
                 WHERE RTRIM(LTRIM(Contract_Assignment_ID)) IN ({placeholders})
-            ''', position_ids)
+            ''', b4_position_ids)
             
             sub_columns = [column[0] for column in cursor.description]
-            
-            # Create lookup dict for positions
-            pos_lookup = {p['position_id']: p for p in positions}
             
             for row in cursor.fetchall():
                 sub = dict(zip(sub_columns, row))
@@ -127,9 +185,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     elif sub.get('Agency_Retracted_Date'):
                         decline_reason = 'Agency Retracted'
                     
-                    # Determine if GHR
+                    # Determine if GHR (GHR or Planet Healthcare, not The Planet Group)
                     agency = str(sub.get('Agency_Name') or '').lower()
-                    is_ghr = 'ghr' in agency or 'planet' in agency
+                    is_ghr = 'ghr' in agency or 'planet healthcare' in agency
                     
                     # Build candidate object
                     candidate = {
@@ -162,9 +220,107 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                         else:
                             position['avSubs'] += 1
         
+        # ============================================================
+        # PART 4: Get VNDLY Submissions
+        # ============================================================
+        if vndly_position_ids:
+            placeholders = ','.join(['?' for _ in vndly_position_ids])
+            cursor.execute(f'''
+                SELECT 
+                    RTRIM(LTRIM([Job Id])) AS job_id,
+                    [Full Name] AS candidate_name,
+                    [Vendor Company Name] AS agency,
+                    [Application Date] AS submission_date,
+                    [Status] AS status,
+                    [Client Interview Date] AS interview_date,
+                    [Client Rejected Date] AS client_rejected_date,
+                    [Rejected Reason - Choice] AS reject_reason_choice,
+                    [Rejected Reason - Text] AS reject_reason_text,
+                    [Vendor Offer Declined Date] AS vendor_declined_date,
+                    [Vendor Withdrawn Date] AS vendor_withdrawn_date,
+                    [Withdrawal Reason - Choice] AS withdrawal_reason_choice,
+                    [Withdrawal Reason - Text] AS withdrawal_reason_text,
+                    [Offer Release Date] AS offer_date,
+                    [Offer Accepted Date] AS offer_accepted_date,
+                    [Onboarded Date] AS onboarded_date,
+                    [Ready To Onboard Date] AS rto_date,
+                    [Candidate ID] AS candidate_id
+                FROM dbo.STAGING_VNDLY_SUBMISSIONS
+                WHERE RTRIM(LTRIM([Job Id])) IN ({placeholders})
+            ''', vndly_position_ids)
+            
+            sub_columns = [column[0] for column in cursor.description]
+            
+            for row in cursor.fetchall():
+                sub = dict(zip(sub_columns, row))
+                pos_id = sub.get('job_id')
+                
+                if pos_id and pos_id in pos_lookup:
+                    position = pos_lookup[pos_id]
+                    
+                    status = str(sub.get('status') or '').lower()
+                    
+                    # Determine if declined/withdrawn based on dates OR status
+                    is_declined = bool(
+                        sub.get('client_rejected_date') or 
+                        sub.get('vendor_declined_date') or 
+                        sub.get('vendor_withdrawn_date') or
+                        status in ('rejected', 'offer declined', 'job closed')
+                    )
+                    
+                    # Determine decline reason
+                    decline_reason = None
+                    if sub.get('client_rejected_date') or status == 'rejected':
+                        decline_reason = sub.get('reject_reason_choice') or sub.get('reject_reason_text') or 'Client Rejected'
+                    elif sub.get('vendor_declined_date') or status == 'offer declined':
+                        decline_reason = 'Vendor Declined Offer'
+                    elif sub.get('vendor_withdrawn_date'):
+                        decline_reason = sub.get('withdrawal_reason_choice') or sub.get('withdrawal_reason_text') or 'Vendor Withdrawn'
+                    elif status == 'job closed':
+                        decline_reason = 'Job Closed'
+                    
+                    # Determine if GHR (GHR or Planet Healthcare, not The Planet Group)
+                    agency = str(sub.get('agency') or '').lower()
+                    is_ghr = 'ghr' in agency or 'planet healthcare' in agency
+                    
+                    # Build candidate object
+                    candidate = {
+                        'name': sub.get('candidate_name') or 'Unknown',
+                        'agency': sub.get('agency') or 'Unknown',
+                        'submitDate': sub.get('submission_date').isoformat() if sub.get('submission_date') and hasattr(sub.get('submission_date'), 'isoformat') else None,
+                        'offerDate': sub.get('offer_date').isoformat() if sub.get('offer_date') and hasattr(sub.get('offer_date'), 'isoformat') else None,
+                        'awardedDate': sub.get('offer_accepted_date').isoformat() if sub.get('offer_accepted_date') and hasattr(sub.get('offer_accepted_date'), 'isoformat') else None,
+                        'rto': sub.get('rto_date').isoformat() if sub.get('rto_date') and hasattr(sub.get('rto_date'), 'isoformat') else None,
+                        'isDeclined': is_declined,
+                        'declineReason': decline_reason,
+                        'hospDeclineDate': sub.get('client_rejected_date').isoformat() if sub.get('client_rejected_date') and hasattr(sub.get('client_rejected_date'), 'isoformat') else None,
+                        'agencyDeclineDate': sub.get('vendor_declined_date').isoformat() if sub.get('vendor_declined_date') and hasattr(sub.get('vendor_declined_date'), 'isoformat') else None,
+                        'agencyRetractedDate': sub.get('vendor_withdrawn_date').isoformat() if sub.get('vendor_withdrawn_date') and hasattr(sub.get('vendor_withdrawn_date'), 'isoformat') else None,
+                        'interviewDate': sub.get('interview_date').isoformat() if sub.get('interview_date') and hasattr(sub.get('interview_date'), 'isoformat') else None,
+                        'isGHR': is_ghr,
+                        'isActive': sub.get('status') == 'Active' if sub.get('status') else False,
+                        'status': sub.get('status')
+                    }
+                    
+                    position['candidates'].append(candidate)
+                    
+                    # Update counts
+                    if is_declined:
+                        if is_ghr:
+                            position['ghrDeclines'] += 1
+                        else:
+                            position['avDeclines'] += 1
+                    else:
+                        if is_ghr:
+                            position['ghrSubs'] += 1
+                        else:
+                            position['avSubs'] += 1
+        
         conn.close()
         
-        print(f"Returning {len(positions)} positions")
+        b4_count = len([p for p in positions if p.get('source_system') == 'B4'])
+        vndly_count = len([p for p in positions if p.get('source_system') == 'VNDLY'])
+        print(f"Returning {len(positions)} positions (B4: {b4_count}, VNDLY: {vndly_count})")
         
         return func.HttpResponse(
             json.dumps(positions, default=str),
