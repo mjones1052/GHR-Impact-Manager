@@ -1459,9 +1459,9 @@
        */
       getHealthSystem(facilityName, dbHealthSystem) {
         if (!facilityName && !dbHealthSystem) return '';
-        
+
         const f = (facilityName || '').toLowerCase();
-        
+
         // Check each mapping in CONSTANTS
         for (const mapping of CONSTANTS.HEALTH_SYSTEM_MAPPINGS) {
           for (const keyword of mapping.keywords) {
@@ -1470,9 +1470,38 @@
             }
           }
         }
-        
+
         // No match found - return database value or empty string
         return dbHealthSystem || '';
+      },
+
+      /**
+       * Check if a record matches any of the selected health systems
+       * More robust matching that checks healthSystem, raw system value, and facility keywords
+       */
+      matchesSelectedSystems(record, selectedSystems) {
+        if (selectedSystems.size === 0) return true;
+
+        // Check 1: Exact match on mapped healthSystem
+        if (record.healthSystem && selectedSystems.has(record.healthSystem)) return true;
+
+        // Check 2: Exact match on raw system value from database
+        if (record.system && selectedSystems.has(record.system)) return true;
+
+        // Check 3: Facility name contains keywords from any selected system's mapping
+        const facilityLower = (record.facility || '').toLowerCase();
+        if (facilityLower) {
+          for (const selectedSystem of selectedSystems) {
+            const mapping = CONSTANTS.HEALTH_SYSTEM_MAPPINGS.find(m => m.system === selectedSystem);
+            if (mapping) {
+              for (const keyword of mapping.keywords) {
+                if (facilityLower.includes(keyword)) return true;
+              }
+            }
+          }
+        }
+
+        return false;
       },
 
       calculateImpactPercent(levers) {
@@ -2663,7 +2692,7 @@
 
         const now = new Date();
         const activeContractsFiltered = (s.statsData.onAssignment || []).filter(r => {
-          const sysMatch = s.filterSelection.systems.size === 0 || (r.healthSystem && s.filterSelection.systems.has(r.healthSystem));
+          const sysMatch = Utils.matchesSelectedSystems(r, s.filterSelection.systems);
           const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
           const isActive = r.startDate && r.startDate <= now && (!r.endDate || r.endDate >= now);
           return sysMatch && facMatch && isActive;
@@ -2761,7 +2790,7 @@
 
         const metrics = buckets.map(bucket => {
           const activeAssignments = (s.statsData.onAssignment || []).filter(r => {
-            const sysMatch = s.filterSelection.systems.size === 0 || (r.healthSystem && s.filterSelection.systems.has(r.healthSystem));
+            const sysMatch = Utils.matchesSelectedSystems(r, s.filterSelection.systems);
             const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
             const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
             if (!(sysMatch && facMatch && specMatch)) return false;
@@ -2778,7 +2807,7 @@
           const fulfillment = totalOnAssg > 0 ? ((ghrCount / totalOnAssg) * 100).toFixed(1) : 0;
 
           const filteredUpcoming = (s.statsData.upcoming || []).filter(r => {
-            const sysMatch = s.filterSelection.systems.size === 0 || (r.healthSystem && s.filterSelection.systems.has(r.healthSystem));
+            const sysMatch = Utils.matchesSelectedSystems(r, s.filterSelection.systems);
             const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
             const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
             return sysMatch && facMatch && specMatch;
