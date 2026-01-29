@@ -31,7 +31,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # ============================================================
         try:
             cursor.execute('''
-                SELECT 
+                SELECT
                     'B4' AS source_system,
                     Contract_ID AS position_id,
                     Professional AS candidate_name,
@@ -43,7 +43,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     End_Date AS endDate,
                     Contract_Status AS status
                 FROM dhc.B4HealthOrder
-                WHERE Contract_Status IN ('Active', 'On Assignment', 'Working')
+                WHERE Contract_Status = 'Closed And Awarded'
                     AND Start_Date IS NOT NULL
                     AND Start_Date <= GETDATE()
                     AND (End_Date IS NULL OR End_Date >= GETDATE())
@@ -66,7 +66,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         # ============================================================
         try:
             cursor.execute('''
-                SELECT 
+                SELECT
                     'B4' AS source_system,
                     Contract_ID AS position_id,
                     Professional AS candidate_name,
@@ -78,7 +78,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                     End_Date AS endDate,
                     Contract_Status AS status
                 FROM dhc.B4HealthOrder
-                WHERE Contract_Status IN ('Confirmed', 'Scheduled', 'Upcoming', 'Pending Start')
+                WHERE Contract_Status = 'Closed And Awarded'
                     AND Start_Date IS NOT NULL
                     AND Start_Date > GETDATE()
                     AND Start_Date <= DATEADD(day, 30, GETDATE())
