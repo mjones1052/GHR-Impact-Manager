@@ -1454,18 +1454,19 @@
       },
 
       /**
-       * Get normalized health system name from facility name
-       * Falls back to database value if no mapping match
+       * Get normalized health system name from facility name or database value
+       * Checks both facility name AND database health system value against keywords
        */
       getHealthSystem(facilityName, dbHealthSystem) {
         if (!facilityName && !dbHealthSystem) return '';
 
         const f = (facilityName || '').toLowerCase();
+        const db = (dbHealthSystem || '').toLowerCase();
 
-        // Check each mapping in CONSTANTS
+        // Check each mapping in CONSTANTS against both facility and db health system
         for (const mapping of CONSTANTS.HEALTH_SYSTEM_MAPPINGS) {
           for (const keyword of mapping.keywords) {
-            if (f.includes(keyword)) {
+            if (f.includes(keyword) || db.includes(keyword)) {
               return mapping.system;
             }
           }
