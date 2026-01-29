@@ -34,11 +34,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 SELECT
                     'B4' AS source_system,
                     Contract_ID AS position_id,
-                    Professional AS candidate_name,
-                    Agency_Name AS agency,
-                    Facility_Name AS facility,
+                    CONCAT(First_Name, ' ', Last_Name) AS candidate_name,
+                    Agency AS agency,
+                    Facility AS facility,
                     Health_System AS system,
-                    Specialty AS specialty,
+                    Care_Type AS specialty,
                     Start_Date AS startDate,
                     End_Date AS endDate,
                     Contract_Status AS status
@@ -69,11 +69,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 SELECT
                     'B4' AS source_system,
                     Contract_ID AS position_id,
-                    Professional AS candidate_name,
-                    Agency_Name AS agency,
-                    Facility_Name AS facility,
+                    CONCAT(First_Name, ' ', Last_Name) AS candidate_name,
+                    Agency AS agency,
+                    Facility AS facility,
                     Health_System AS system,
-                    Specialty AS specialty,
+                    Care_Type AS specialty,
                     Start_Date AS startDate,
                     End_Date AS endDate,
                     Contract_Status AS status
