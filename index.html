@@ -167,7 +167,12 @@
       
       <!-- User Display & Logout - Top Right -->
       <div class="flex items-center gap-1 sm:gap-2 flex-wrap">
-        <button onclick="openSettingsModal()" 
+        <!-- Connection Status Indicator -->
+        <div id="connectionStatus" class="flex items-center gap-1.5 bg-white border border-slate-200 rounded-md px-2 sm:px-3 h-[32px] sm:h-[38px] shadow-sm" title="Database connection status">
+          <div id="connectionDot" class="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <span id="connectionText" class="text-xs text-slate-500 hidden sm:inline">Connected</span>
+        </div>
+        <button onclick="openSettingsModal()"
                 class="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 sm:px-3 rounded-md shadow-sm text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                 title="Settings">
           <i data-lucide="settings" class="w-4 h-4"></i>
@@ -228,12 +233,6 @@
         
         <!-- Buttons -->
         <div class="flex gap-1 sm:gap-2 items-center flex-wrap">
-          <button id="saveBtn"
-                  class="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
-                  onclick="exportData()" title="Download updated file">
-            <i data-lucide="save" class="w-4 h-4"></i> <span class="hidden sm:inline">Save</span>
-          </button>
-          
           <button class="flex items-center gap-1 sm:gap-2 bg-orange-600 hover:bg-orange-700 text-white px-2 sm:px-4 rounded-md shadow-sm text-xs sm:text-sm font-medium transition-colors h-[32px] sm:h-[38px]"
                   onclick="store.dispatch('GENERATE_HOT_JOBS_EMAIL')" title="AI Hot Job Summary">
               <i data-lucide="flame" class="w-4 h-4"></i>
@@ -514,6 +513,45 @@
     </div>
   </div>
 
+  <!-- CONNECTION LOST MODAL - Blocks UI until page refresh -->
+  <div id="connectionLostModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-md">
+    <div class="bg-white rounded-lg shadow-2xl w-[450px] border border-red-200 overflow-hidden">
+      <div class="bg-red-50 p-5 border-b border-red-200 flex items-center gap-4">
+        <div class="bg-red-100 rounded-full p-3">
+          <i data-lucide="wifi-off" class="w-8 h-8 text-red-600"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-red-800 text-xl">Connection Lost</h3>
+          <p class="text-red-600 text-sm">Database connection unavailable</p>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5">
+          <div class="flex items-start gap-3">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 mt-0.5 shrink-0"></i>
+            <div class="text-sm text-amber-800">
+              <p class="font-medium mb-1">Changes cannot be saved</p>
+              <p>The connection to the database has been lost. Please refresh the page to reconnect before making any changes.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-sm text-slate-500 text-center mb-4">
+          If the problem persists after refreshing, check your network connection or contact IT.
+        </p>
+      </div>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
+        <button onclick="location.reload()"
+                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors shadow-sm">
+          <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+          Refresh Page
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const $ = (id) => document.getElementById(id);
 
@@ -524,7 +562,33 @@
         changesEndpoint: `${API_BASE_URL}/changes`,
         historyEndpoint: `${API_BASE_URL}/history`
     };
-    
+
+    // Connection state management - tracks database connectivity
+    const ConnectionManager = {
+        state: 'connected',           // 'connected' | 'disconnected'
+        consecutiveFailures: 0,
+        FAILURE_THRESHOLD: 2,         // Consecutive failures before showing modal
+
+        recordFailure() {
+            this.consecutiveFailures++;
+
+            if (this.consecutiveFailures >= this.FAILURE_THRESHOLD && this.state === 'connected') {
+                this.state = 'disconnected';
+                showConnectionLostModal();
+                updateConnectionIndicator();
+            }
+        },
+
+        recordSuccess() {
+            this.consecutiveFailures = 0;
+            this.state = 'connected';
+        },
+
+        isConnected() {
+            return this.state === 'connected';
+        }
+    };
+
     // Global change log and history
     let changeLog = [];
     let historyVersions = [];
@@ -876,8 +940,13 @@
             
             if (usingTestData) {
                 window.showToast(`Loaded ${processedJobs.length} test positions (Demo Mode - Database not connected)`, 'info');
+                // Track connection failure when falling back to test data
+                ConnectionManager.recordFailure();
             } else {
                 window.showToast(`Loaded ${processedJobs.length} positions from database`, 'success');
+                // Mark connection as healthy after successful database load
+                ConnectionManager.recordSuccess();
+                updateConnectionIndicator();
             }
             
             // Load stats data for the Stats tab
@@ -928,6 +997,8 @@
             console.error('Error loading data:', error);
             Utils.setLoading(false);
             window.showToast('Error loading data: ' + error.message, 'error');
+            // Track connection failure on load errors
+            ConnectionManager.recordFailure();
             return false;
         }
     };
@@ -1198,7 +1269,8 @@
     }
     
     /**
-     * Record a change and save to database (or localStorage in demo mode)
+     * Record a change and save to database
+     * Integrated with ConnectionManager for connection tracking
      */
     async function recordChange(jobId, changeType, changeData) {
         const change = {
@@ -1209,9 +1281,16 @@
             data: changeData,
             user: getCurrentUser()
         };
-        
+
+        // If already disconnected, don't attempt save (modal should be blocking UI)
+        if (!ConnectionManager.isConnected()) {
+            window.showToast('Connection lost - please refresh the page', 'error');
+            return false;
+        }
+
+        // Add to local changelog
         changeLog.push(change);
-        
+
         try {
             const response = await fetch(DB_CONFIG.changesEndpoint, {
                 method: 'POST',
@@ -1220,31 +1299,30 @@
                 },
                 body: JSON.stringify(change)
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
+            // Success - record it and create snapshot
+            ConnectionManager.recordSuccess();
             await createHistorySnapshot();
-            
+
             console.log('Recorded change to database:', change);
             return true;
         } catch (error) {
-            // Fallback to localStorage in demo mode
-            console.warn('Could not save to database, using localStorage (demo mode):', error);
-            try {
-                localStorage.setItem('ghr_demo_changes', JSON.stringify(changeLog));
-                await createHistorySnapshot(); // Create snapshot in demo mode too
-                console.log('Recorded change to localStorage (demo mode):', change);
-                return true;
-            } catch (localError) {
-                console.error('Error saving to localStorage:', localError);
-                const idx = changeLog.findIndex(c => c.id === change.id);
-                if (idx > -1) {
-                    changeLog.splice(idx, 1);
-                }
-                return false;
+            console.error('Failed to save change to database:', error);
+
+            // Record the failure - this may trigger the connection lost modal
+            ConnectionManager.recordFailure();
+
+            // Remove from changelog since we couldn't save it
+            const idx = changeLog.findIndex(c => c.id === change.id);
+            if (idx > -1) {
+                changeLog.splice(idx, 1);
             }
+
+            return false;
         }
     }
     
@@ -2798,11 +2876,23 @@
               s.jobs = payload.jobs || [];
               s.statsData = payload.statsData || { onAssignment: [], upcoming: [] };
 
-              // Use healthSystem (mapped value) for system filter
-              s.filters.systems = new Set(s.jobs.map(j => j.healthSystem).filter(Boolean));
-              s.filters.facilities = new Set(s.jobs.map(j => j.facility).filter(Boolean));
+              // Combine jobs AND statsData for filter options (so KPIs filter correctly for both B4Health and VNDLY)
+              const allAssignments = [...(s.statsData.onAssignment || []), ...(s.statsData.upcoming || [])];
+
+              // Use healthSystem (mapped value) for system filter - include both jobs and assignments
+              s.filters.systems = new Set([
+                ...s.jobs.map(j => j.healthSystem),
+                ...allAssignments.map(a => a.healthSystem)
+              ].filter(Boolean));
+              s.filters.facilities = new Set([
+                ...s.jobs.map(j => j.facility),
+                ...allAssignments.map(a => a.facility)
+              ].filter(Boolean));
               s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
-              s.filters.specialties = new Set(s.jobs.map(j => j.specialty).filter(Boolean));
+              s.filters.specialties = new Set([
+                ...s.jobs.map(j => j.specialty),
+                ...allAssignments.map(a => a.specialty)
+              ].filter(Boolean));
 
               ['systems', 'facilities', 'categories', 'specialties'].forEach(k => {
                 const valid = s.filters[k];
@@ -2817,12 +2907,23 @@
             }
 
             case 'REFRESH_UI': {
-              // Populate filters from current jobs data
-              s.filters.systems = new Set(s.jobs.map(j => j.healthSystem).filter(Boolean));
-              s.filters.facilities = new Set(s.jobs.map(j => j.facility).filter(Boolean));
+              // Combine jobs AND statsData for filter options (so KPIs filter correctly for both B4Health and VNDLY)
+              const allAssignments = [...(s.statsData.onAssignment || []), ...(s.statsData.upcoming || [])];
+
+              s.filters.systems = new Set([
+                ...s.jobs.map(j => j.healthSystem),
+                ...allAssignments.map(a => a.healthSystem)
+              ].filter(Boolean));
+              s.filters.facilities = new Set([
+                ...s.jobs.map(j => j.facility),
+                ...allAssignments.map(a => a.facility)
+              ].filter(Boolean));
               s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
-              s.filters.specialties = new Set(s.jobs.map(j => j.specialty).filter(Boolean));
-              
+              s.filters.specialties = new Set([
+                ...s.jobs.map(j => j.specialty),
+                ...allAssignments.map(a => a.specialty)
+              ].filter(Boolean));
+
               View.initFilters();
               View.viewToggle();
               View.main();
@@ -3526,7 +3627,30 @@
     window.closeSettingsModal = function() {
         document.getElementById('settingsModal').classList.add('hidden');
     };
-    
+
+    // CONNECTION LOST MODAL FUNCTIONS
+
+    function showConnectionLostModal() {
+        const modal = document.getElementById('connectionLostModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+    }
+
+    function updateConnectionIndicator() {
+        const dot = document.getElementById('connectionDot');
+        const text = document.getElementById('connectionText');
+
+        if (ConnectionManager.isConnected()) {
+            if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            if (text) text.textContent = 'Connected';
+        } else {
+            if (dot) dot.className = 'w-2 h-2 rounded-full bg-red-500 animate-pulse';
+            if (text) text.textContent = 'Disconnected';
+        }
+    }
+
     function renderMappingsTable() {
         const tbody = document.getElementById('mappingsTableBody');
         if (!tbody) return;
