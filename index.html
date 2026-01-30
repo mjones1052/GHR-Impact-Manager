@@ -504,6 +504,10 @@
             <textarea id="summaryText" class="w-full border border-slate-300 rounded p-2 text-xs font-mono bg-slate-50 h-64 mb-2 focus:outline-none"></textarea>
             <button onclick="window.copySummary(this)" class="text-xs text-blue-600 hover:underline">Copy to Clipboard</button>
           </div>
+
+          <div id="nextStepHistoryContainer" class="hidden">
+            <div id="nextStepHistoryContent" class="space-y-2 max-h-[400px] overflow-y-auto"></div>
+          </div>
         </div>
       </div>
 
@@ -1569,6 +1573,41 @@
       checkCategoryMatch(program, filterVal) {
         if (!filterVal) return true;
         return String(program || '').toLowerCase() === String(filterVal || '').toLowerCase();
+      },
+
+      /**
+       * Match stats records against category filter using specialty field
+       * Stats data doesn't have 'program', so we match specialty against category keywords
+       */
+      matchesStatsCategoryFilter(specialty, selectedCategories) {
+        if (!selectedCategories || selectedCategories.size === 0) return true;
+        if (!specialty) return false;
+
+        const specLower = String(specialty).toLowerCase();
+
+        // Check if any selected category matches via keywords
+        for (const cat of selectedCategories) {
+          const catLower = String(cat).toLowerCase();
+
+          // Check if this category is nursing-related
+          const isNursingCat = CONSTANTS.NURSING_KEYWORDS.some(k => catLower.includes(k));
+          if (isNursingCat && CONSTANTS.NURSING_KEYWORDS.some(k => specLower.includes(k))) {
+            return true;
+          }
+
+          // Check if this category is allied-related
+          const isAlliedCat = CONSTANTS.ALLIED_KEYWORDS.some(k => catLower.includes(k));
+          if (isAlliedCat && CONSTANTS.ALLIED_KEYWORDS.some(k => specLower.includes(k))) {
+            return true;
+          }
+
+          // Direct match on category name in specialty
+          if (specLower.includes(catLower) || catLower.includes(specLower)) {
+            return true;
+          }
+        }
+
+        return false;
       },
 
       renderChunks(items, container, renderFn, batchSize = 50, onComplete) {
@@ -2673,10 +2712,17 @@
 
                   <!-- Next Steps (Moved Here) -->
                   <div class="border border-slate-200 border-dashed p-3 rounded bg-slate-50/50 flex flex-col gap-2">
-                     <button class="w-full bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-2 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
-                            onclick="window.store.dispatch('OPEN_MODAL',{type:'next_step',jobId:'${job.id}'})">
-                      <i data-lucide="message-square" class="w-3 h-3"></i> ${job.nextStep ? 'Update Next Step' : 'Add Next Step'}
-                     </button>
+                     <div class="flex gap-2">
+                       <button class="flex-1 bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-2 py-1.5 rounded text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-sm"
+                              onclick="window.store.dispatch('OPEN_MODAL',{type:'next_step',jobId:'${job.id}'})">
+                        <i data-lucide="message-square" class="w-3 h-3"></i> ${job.nextStep ? 'Update Next Step' : 'Add Next Step'}
+                       </button>
+                       <button class="bg-white border border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700 px-2 py-1.5 rounded text-xs font-medium flex items-center justify-center gap-1 transition-colors shadow-sm"
+                              onclick="window.store.dispatch('OPEN_MODAL',{type:'next_step_history',jobId:'${job.id}'})"
+                              title="View next step history">
+                        <i data-lucide="history" class="w-3 h-3"></i> History
+                       </button>
+                     </div>
                      ${job.nextStep ? `<div class="text-[10px] text-yellow-800 bg-yellow-50 p-2 rounded border border-yellow-100 leading-snug break-words whitespace-pre-wrap">${job.nextStep.text} <em class="block mt-1 text-slate-400 font-normal not-italic">(${job.nextStep.user || 'Unknown'})</em></div>` : ''}
                   </div>
 
@@ -2699,8 +2745,10 @@
         const activeContractsFiltered = (s.statsData.onAssignment || []).filter(r => {
           const sysMatch = Utils.matchesSelectedSystems(r, s.filterSelection.systems);
           const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
+          const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
+          const catMatch = Utils.matchesStatsCategoryFilter(r.specialty, s.filterSelection.categories);
           const isActive = r.startDate && r.startDate <= now && (!r.endDate || r.endDate >= now);
-          return sysMatch && facMatch && isActive;
+          return sysMatch && facMatch && specMatch && catMatch && isActive;
         });
 
         const activeCount = activeContractsFiltered.length;
@@ -2798,7 +2846,8 @@
             const sysMatch = Utils.matchesSelectedSystems(r, s.filterSelection.systems);
             const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
             const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
-            if (!(sysMatch && facMatch && specMatch)) return false;
+            const catMatch = Utils.matchesStatsCategoryFilter(r.specialty, s.filterSelection.categories);
+            if (!(sysMatch && facMatch && specMatch && catMatch)) return false;
             return r.startDate <= bucket.end && (!r.endDate || r.endDate >= bucket.start);
           });
 
@@ -2815,7 +2864,8 @@
             const sysMatch = Utils.matchesSelectedSystems(r, s.filterSelection.systems);
             const facMatch = s.filterSelection.facilities.size === 0 || (r.facility && s.filterSelection.facilities.has(r.facility));
             const specMatch = s.filterSelection.specialties.size === 0 || (r.specialty && s.filterSelection.specialties.has(Utils.cleanFilterText(r.specialty)));
-            return sysMatch && facMatch && specMatch;
+            const catMatch = Utils.matchesStatsCategoryFilter(r.specialty, s.filterSelection.categories);
+            return sysMatch && facMatch && specMatch && catMatch;
           });
 
           const allRows = [...activeAssignments, ...filteredUpcoming];
@@ -2923,9 +2973,10 @@
                 ...allAssignments.map(a => a.facility)
               ].filter(Boolean));
               s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
+              // Apply cleanFilterText to specialty values for consistent matching
               s.filters.specialties = new Set([
-                ...s.jobs.map(j => j.specialty),
-                ...allAssignments.map(a => a.specialty)
+                ...s.jobs.map(j => Utils.cleanFilterText(j.specialty)),
+                ...allAssignments.map(a => Utils.cleanFilterText(a.specialty))
               ].filter(Boolean));
 
               ['systems', 'facilities', 'categories', 'specialties'].forEach(k => {
@@ -2953,9 +3004,10 @@
                 ...allAssignments.map(a => a.facility)
               ].filter(Boolean));
               s.filters.categories = new Set(s.jobs.map(j => j.program).filter(Boolean));
+              // Apply cleanFilterText to specialty values for consistent matching
               s.filters.specialties = new Set([
-                ...s.jobs.map(j => j.specialty),
-                ...allAssignments.map(a => a.specialty)
+                ...s.jobs.map(j => Utils.cleanFilterText(j.specialty)),
+                ...allAssignments.map(a => Utils.cleanFilterText(a.specialty))
               ].filter(Boolean));
 
               View.initFilters();
@@ -3172,6 +3224,7 @@
               summaryView?.classList.add('hidden');
               removeReasonInput?.classList.add('hidden');
               $('marginInputContainer')?.classList.add('hidden');
+              $('nextStepHistoryContainer')?.classList.add('hidden');
 
               confirmBtn.classList.remove('hidden');
               if ($('leverTagInput')) $('leverTagInput').value = "";
@@ -3218,6 +3271,41 @@
               } else if (payload.type === 'summary') {
                 modalTitle.innerText = payload.title || "AI Session Notes";
                 summaryView?.classList.remove('hidden');
+                confirmBtn.classList.add('hidden');
+
+              } else if (payload.type === 'next_step_history') {
+                modalTitle.innerText = "Next Step History";
+                const historyContainer = $('nextStepHistoryContainer');
+                const historyContent = $('nextStepHistoryContent');
+                if (historyContainer && historyContent) {
+                  historyContainer.classList.remove('hidden');
+
+                  // Get all next_step_update changes for this job from changeLog
+                  const jobHistory = changeLog
+                    .filter(c => c.jobId === payload.jobId && c.type === 'next_step_update')
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                  if (jobHistory.length === 0) {
+                    historyContent.innerHTML = '<p class="text-slate-500 text-sm text-center py-4">No next step history found for this position.</p>';
+                  } else {
+                    historyContent.innerHTML = jobHistory.map((entry, idx) => {
+                      const date = new Date(entry.timestamp);
+                      const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const nextStep = entry.data?.nextStep || {};
+                      const isLatest = idx === 0;
+                      return `
+                        <div class="p-3 rounded border ${isLatest ? 'bg-yellow-50 border-yellow-200' : 'bg-slate-50 border-slate-200'}">
+                          <div class="flex justify-between items-start mb-1">
+                            <span class="text-xs font-bold ${isLatest ? 'text-yellow-700' : 'text-slate-600'}">${isLatest ? 'Current' : ''}</span>
+                            <span class="text-xs text-slate-400">${formattedDate}</span>
+                          </div>
+                          <p class="text-sm text-slate-700 whitespace-pre-wrap">${nextStep.text || 'No text'}</p>
+                          <p class="text-xs text-slate-400 mt-1">By: ${nextStep.user || entry.user || 'Unknown'}</p>
+                        </div>
+                      `;
+                    }).join('');
+                  }
+                }
                 confirmBtn.classList.add('hidden');
               }
 
