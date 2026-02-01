@@ -614,8 +614,8 @@
   <script>
     const $ = (id) => document.getElementById(id);
 
-    // App version - update this for each release
-    const APP_VERSION = '1.3.0';
+    // App version - loaded from environment variable via API, with fallback
+    let APP_VERSION = '1.3.0';
 
     const API_BASE_URL = '/api';
     
@@ -997,7 +997,7 @@
         try {
             let rawPositions;
             
-            // Fetch config (default margin) from API
+            // Fetch config (default margin, app version) from API
             try {
                 const configResponse = await fetch(`${API_BASE_URL}/get-config`);
                 if (configResponse.ok) {
@@ -1006,9 +1006,15 @@
                         defaultMargin = parseFloat(config.defaultMargin);
                         console.log('Loaded default margin from config:', defaultMargin);
                     }
+                    if (config.appVersion) {
+                        APP_VERSION = config.appVersion;
+                        const versionEl = document.getElementById('versionDisplay');
+                        if (versionEl) versionEl.textContent = `v${APP_VERSION}`;
+                        console.log('Loaded app version from config:', APP_VERSION);
+                    }
                 }
             } catch (configError) {
-                console.warn('Could not load config, using default margin:', defaultMargin);
+                console.warn('Could not load config, using defaults');
             }
             
             // Fetch health system mappings from database

@@ -5,7 +5,8 @@ import json
 def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         config = {
-            'defaultMargin': os.environ.get('DEFAULT_MARGIN', '25')
+            'defaultMargin': os.environ.get('DEFAULT_MARGIN', '25'),
+            'appVersion': os.environ.get('APP_VERSION', '1.3.0')
         }
         
         return func.HttpResponse(
