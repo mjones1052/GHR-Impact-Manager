@@ -995,8 +995,6 @@
      */
     window.loadDataFromDatabase = async function() {
         try {
-            Utils.setLoading(true, "Loading data from database...");
-
             let rawPositions;
             
             // Fetch config (default margin) from API
@@ -1044,7 +1042,6 @@
                 }
             } catch (fetchError) {
                 console.error('Database connection failed:', fetchError);
-                Utils.setLoading(false);
 
                 // Show the connection validation overlay with failed state
                 const overlay = $('connectionValidationOverlay');
@@ -1140,12 +1137,10 @@
                 console.warn('Error loading stats data:', statsError);
                 window.store.state.statsData = { onAssignment: [], upcoming: [] };
             }
-            
-            Utils.setLoading(false);
+
             return true;
         } catch (error) {
             console.error('Error loading data:', error);
-            Utils.setLoading(false);
             window.showToast('Error loading data: ' + error.message, 'error');
             // Track connection failure on load errors
             ConnectionManager.recordFailure();
@@ -2298,8 +2293,8 @@
 
         // Get jobs that match current filters (for determining available options)
         // We need to check each filter independently to determine what options are valid for OTHER filters
+        // Note: We only use jobs for cascading (not assignments) since assignments lack category data
         const allJobs = s.jobs;
-        const allAssignments = [...(s.statsData.onAssignment || []), ...(s.statsData.upcoming || [])];
 
         // Helper to check if a job matches a specific set of filters (excluding one filter type)
         const jobMatchesFilters = (job, excludeFilter) => {
@@ -2329,9 +2324,6 @@
               validSystems.add(job.healthSystem);
             }
           });
-          allAssignments.forEach(a => {
-            if (a.healthSystem) validSystems.add(a.healthSystem);
-          });
 
           // Remove invalid selections
           s.filterSelection.systems.forEach(sys => {
@@ -2349,9 +2341,6 @@
             if (jobMatchesFilters(job, 'facilities') && job.facility) {
               validFacilities.add(job.facility);
             }
-          });
-          allAssignments.forEach(a => {
-            if (a.facility) validFacilities.add(a.facility);
           });
 
           // Remove invalid selections
@@ -2388,9 +2377,6 @@
             if (jobMatchesFilters(job, 'specialties') && job.specialty) {
               validSpecialties.add(Utils.cleanFilterText(job.specialty));
             }
-          });
-          allAssignments.forEach(a => {
-            if (a.specialty) validSpecialties.add(Utils.cleanFilterText(a.specialty));
           });
 
           // Remove invalid selections
