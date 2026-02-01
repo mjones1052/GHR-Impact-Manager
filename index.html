@@ -2288,6 +2288,123 @@
         lucide.createIcons();
       },
 
+      /**
+       * Update all filter dropdown options based on currently filtered data
+       * Called when any filter changes to show only relevant options in other dropdowns
+       * @param {string} changedFilter - The filter that was just changed (to skip updating it)
+       */
+      updateAllFilterOptions(changedFilter) {
+        const s = window.store.state;
+
+        // Get jobs that match current filters (for determining available options)
+        // We need to check each filter independently to determine what options are valid for OTHER filters
+        const allJobs = s.jobs;
+        const allAssignments = [...(s.statsData.onAssignment || []), ...(s.statsData.upcoming || [])];
+
+        // Helper to check if a job matches a specific set of filters (excluding one filter type)
+        const jobMatchesFilters = (job, excludeFilter) => {
+          if (excludeFilter !== 'systems') {
+            if (s.filterSelection.systems.size > 0 && !s.filterSelection.systems.has(job.healthSystem)) return false;
+          }
+          if (excludeFilter !== 'facilities') {
+            if (s.filterSelection.facilities.size > 0 && !s.filterSelection.facilities.has(job.facility)) return false;
+          }
+          if (excludeFilter !== 'categories') {
+            if (s.filterSelection.categories.size > 0) {
+              const catMatch = Array.from(s.filterSelection.categories).some(cv => Utils.checkCategoryMatch(job.program, cv));
+              if (!catMatch) return false;
+            }
+          }
+          if (excludeFilter !== 'specialties') {
+            if (s.filterSelection.specialties.size > 0 && !s.filterSelection.specialties.has(Utils.cleanFilterText(job.specialty))) return false;
+          }
+          return true;
+        };
+
+        // Update Systems dropdown (based on jobs matching all OTHER filters)
+        if (changedFilter !== 'systems') {
+          const validSystems = new Set();
+          allJobs.forEach(job => {
+            if (jobMatchesFilters(job, 'systems') && job.healthSystem) {
+              validSystems.add(job.healthSystem);
+            }
+          });
+          allAssignments.forEach(a => {
+            if (a.healthSystem) validSystems.add(a.healthSystem);
+          });
+
+          // Remove invalid selections
+          s.filterSelection.systems.forEach(sys => {
+            if (!validSystems.has(sys)) s.filterSelection.systems.delete(sys);
+          });
+
+          View.renderDropdown('systemFilterContainer', 'systems', validSystems, false);
+          View.updateFilterUI('systems');
+        }
+
+        // Update Facilities dropdown
+        if (changedFilter !== 'facilities') {
+          const validFacilities = new Set();
+          allJobs.forEach(job => {
+            if (jobMatchesFilters(job, 'facilities') && job.facility) {
+              validFacilities.add(job.facility);
+            }
+          });
+          allAssignments.forEach(a => {
+            if (a.facility) validFacilities.add(a.facility);
+          });
+
+          // Remove invalid selections
+          s.filterSelection.facilities.forEach(fac => {
+            if (!validFacilities.has(fac)) s.filterSelection.facilities.delete(fac);
+          });
+
+          View.renderDropdown('facilityFilterContainer', 'facilities', validFacilities, false);
+          View.updateFilterUI('facilities');
+        }
+
+        // Update Categories dropdown
+        if (changedFilter !== 'categories') {
+          const validCategories = new Set();
+          allJobs.forEach(job => {
+            if (jobMatchesFilters(job, 'categories') && job.program) {
+              validCategories.add(job.program);
+            }
+          });
+
+          // Remove invalid selections
+          s.filterSelection.categories.forEach(cat => {
+            if (!validCategories.has(cat)) s.filterSelection.categories.delete(cat);
+          });
+
+          View.renderDropdown('categoryFilterContainer', 'categories', validCategories, true);
+          View.updateFilterUI('categories');
+        }
+
+        // Update Specialties dropdown
+        if (changedFilter !== 'specialties') {
+          const validSpecialties = new Set();
+          allJobs.forEach(job => {
+            if (jobMatchesFilters(job, 'specialties') && job.specialty) {
+              validSpecialties.add(Utils.cleanFilterText(job.specialty));
+            }
+          });
+          allAssignments.forEach(a => {
+            if (a.specialty) validSpecialties.add(Utils.cleanFilterText(a.specialty));
+          });
+
+          // Remove invalid selections
+          s.filterSelection.specialties.forEach(spec => {
+            if (!validSpecialties.has(spec)) s.filterSelection.specialties.delete(spec);
+          });
+
+          View.renderDropdown('specialtyFilterContainer', 'specialties', validSpecialties, false);
+          View.updateFilterUI('specialties');
+        }
+
+        lucide.createIcons();
+      },
+
       renderTags(mode) {
         const container = $('tagContainer');
         if (!container) return;
@@ -3166,10 +3283,32 @@
               if (val === 'All') set.clear();
               else if (val === 'All Nursing') {
                 s.filterSelection.categories.clear();
-                Array.from(s.filters.categories).filter(c => CONSTANTS.NURSING_KEYWORDS.some(k => String(c).toLowerCase().includes(k))).forEach(c => s.filterSelection.categories.add(c));
+                // Get categories from currently visible options (respecting other filters)
+                const categoryContainer = $('categoryFilterContainer');
+                const visibleCategories = categoryContainer ?
+                  Array.from(categoryContainer.querySelectorAll('[onclick*="TOGGLE_FILTER"]'))
+                    .map(el => {
+                      const match = el.getAttribute('onclick')?.match(/val:'([^']+)'/);
+                      return match ? match[1] : null;
+                    })
+                    .filter(c => c && c !== 'All' && c !== 'All Nursing' && c !== 'All Allied') : [];
+                visibleCategories
+                  .filter(c => CONSTANTS.NURSING_KEYWORDS.some(k => String(c).toLowerCase().includes(k)))
+                  .forEach(c => s.filterSelection.categories.add(c));
               } else if (val === 'All Allied') {
                 s.filterSelection.categories.clear();
-                Array.from(s.filters.categories).filter(c => CONSTANTS.ALLIED_KEYWORDS.some(k => String(c).toLowerCase().includes(k))).forEach(c => s.filterSelection.categories.add(c));
+                // Get categories from currently visible options (respecting other filters)
+                const categoryContainer = $('categoryFilterContainer');
+                const visibleCategories = categoryContainer ?
+                  Array.from(categoryContainer.querySelectorAll('[onclick*="TOGGLE_FILTER"]'))
+                    .map(el => {
+                      const match = el.getAttribute('onclick')?.match(/val:'([^']+)'/);
+                      return match ? match[1] : null;
+                    })
+                    .filter(c => c && c !== 'All' && c !== 'All Nursing' && c !== 'All Allied') : [];
+                visibleCategories
+                  .filter(c => CONSTANTS.ALLIED_KEYWORDS.some(k => String(c).toLowerCase().includes(k)))
+                  .forEach(c => s.filterSelection.categories.add(c));
               } else {
                 if (set.has(val)) set.delete(val);
                 else set.add(val);
@@ -3177,10 +3316,8 @@
 
               View.updateFilterUI(type);
 
-              if (type === 'systems') {
-                s.filterSelection.facilities.clear();
-                View.updateFacilityOptions();
-              }
+              // Update all other filter dropdowns to show only relevant options
+              View.updateAllFilterOptions(type);
 
               View.main();
               break;
