@@ -518,6 +518,60 @@
     </div>
   </div>
 
+  <!-- CONNECTION VALIDATION OVERLAY - Shows on page load until connection confirmed -->
+  <div id="connectionValidationOverlay" class="fixed inset-0 bg-slate-900/90 z-[200] flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-[450px] border border-slate-200 overflow-hidden">
+      <div id="validationContent">
+        <!-- Validating State -->
+        <div id="validatingState" class="p-8 text-center">
+          <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+            <i data-lucide="database" class="w-8 h-8 text-blue-600 animate-pulse"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-xl mb-2">Connecting to Database</h3>
+          <p class="text-slate-500 text-sm mb-4">Validating database connection...</p>
+          <div class="flex justify-center">
+            <div class="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          </div>
+        </div>
+
+        <!-- Failed State (hidden by default) -->
+        <div id="validationFailedState" class="hidden">
+          <div class="bg-red-50 p-5 border-b border-red-200 flex items-center gap-4">
+            <div class="bg-red-100 rounded-full p-3">
+              <i data-lucide="database-zap" class="w-8 h-8 text-red-600"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-red-800 text-xl">Connection Failed</h3>
+              <p class="text-red-600 text-sm">Unable to connect to database</p>
+            </div>
+          </div>
+
+          <div class="p-6">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5">
+              <div class="flex items-start gap-3">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 mt-0.5 shrink-0"></i>
+                <div class="text-sm text-amber-800">
+                  <p class="font-medium mb-1">Database Unavailable</p>
+                  <p>The application requires a live database connection to function. Please check your network connection and try again.</p>
+                </div>
+              </div>
+            </div>
+
+            <p id="connectionErrorDetails" class="text-xs text-slate-400 text-center mb-4 font-mono"></p>
+          </div>
+
+          <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-center gap-3">
+            <button onclick="retryConnection()"
+                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors shadow-sm">
+              <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- CONNECTION LOST MODAL - Blocks UI until page refresh -->
   <div id="connectionLostModal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-md">
     <div class="bg-white rounded-lg shadow-2xl w-[450px] border border-red-200 overflow-hidden">
@@ -596,6 +650,82 @@
             return this.state === 'connected';
         }
     };
+
+    /**
+     * Validates database connection before allowing app interaction
+     * Returns true if connection is successful, false otherwise
+     */
+    async function validateDatabaseConnection() {
+        const overlay = $('connectionValidationOverlay');
+        const validatingState = $('validatingState');
+        const failedState = $('validationFailedState');
+        const errorDetails = $('connectionErrorDetails');
+
+        // Show validating state
+        if (validatingState) validatingState.classList.remove('hidden');
+        if (failedState) failedState.classList.add('hidden');
+
+        try {
+            // Try to fetch positions as a connection test
+            const response = await fetch(DB_CONFIG.apiEndpoint, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            // Check if we got an error in the response
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Connection successful - hide overlay
+            if (overlay) overlay.classList.add('hidden');
+            ConnectionManager.recordSuccess();
+            return true;
+
+        } catch (error) {
+            console.error('Database connection validation failed:', error);
+
+            // Show failed state
+            if (validatingState) validatingState.classList.add('hidden');
+            if (failedState) failedState.classList.remove('hidden');
+            if (errorDetails) errorDetails.textContent = error.message || 'Unknown error';
+
+            ConnectionManager.recordFailure();
+            lucide.createIcons();
+            return false;
+        }
+    }
+
+    /**
+     * Retry connection validation - called from retry button
+     */
+    async function retryConnection() {
+        const validatingState = $('validatingState');
+        const failedState = $('validationFailedState');
+
+        // Reset to validating state
+        if (validatingState) validatingState.classList.remove('hidden');
+        if (failedState) failedState.classList.add('hidden');
+        lucide.createIcons();
+
+        // Small delay to show the validating state
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const isConnected = await validateDatabaseConnection();
+        if (isConnected) {
+            // Connection restored - load the app
+            window.loadDataFromDatabase();
+        }
+    }
+
+    // Make retryConnection available globally
+    window.retryConnection = retryConnection;
 
     // Global change log and history
     let changeLog = [];
@@ -866,9 +996,8 @@
     window.loadDataFromDatabase = async function() {
         try {
             Utils.setLoading(true, "Loading data from database...");
-            
+
             let rawPositions;
-            let usingTestData = false;
             
             // Fetch config (default margin) from API
             try {
@@ -901,17 +1030,36 @@
                 console.warn('Could not load mappings from database, using defaults');
             }
             
-            // Try to fetch from database first
+            // Fetch from database - no fallback to test data
             try {
                 const positionsResponse = await fetch(DB_CONFIG.apiEndpoint);
                 if (!positionsResponse.ok) {
                     throw new Error(`HTTP error! status: ${positionsResponse.status}`);
                 }
                 rawPositions = await positionsResponse.json();
+
+                // Check if the API returned an error
+                if (rawPositions.error) {
+                    throw new Error(rawPositions.error);
+                }
             } catch (fetchError) {
-                console.warn('Could not load from database, using test data:', fetchError);
-                rawPositions = generateTestData();
-                usingTestData = true;
+                console.error('Database connection failed:', fetchError);
+                Utils.setLoading(false);
+
+                // Show the connection validation overlay with failed state
+                const overlay = $('connectionValidationOverlay');
+                const validatingState = $('validatingState');
+                const failedState = $('validationFailedState');
+                const errorDetails = $('connectionErrorDetails');
+
+                if (overlay) overlay.classList.remove('hidden');
+                if (validatingState) validatingState.classList.add('hidden');
+                if (failedState) failedState.classList.remove('hidden');
+                if (errorDetails) errorDetails.textContent = fetchError.message || 'Could not connect to database';
+
+                ConnectionManager.recordFailure();
+                lucide.createIcons();
+                return; // Stop loading - don't use test data
             }
             
             // Try to fetch changes
@@ -940,22 +1088,16 @@
             
             // Process the data (apply changes on top of base data)
             const processedJobs = await processPositionData(rawPositions);
-            
+
             // Load into app
             window.store.state.jobs = processedJobs;
-            window.store.state.filename = usingTestData ? "Test Data (Demo Mode)" : "Database (Live)";
+            window.store.state.filename = "Database (Live)";
             window.store.dispatch('REFRESH_UI');
-            
-            if (usingTestData) {
-                window.showToast(`Loaded ${processedJobs.length} test positions (Demo Mode - Database not connected)`, 'info');
-                // Track connection failure when falling back to test data
-                ConnectionManager.recordFailure();
-            } else {
-                window.showToast(`Loaded ${processedJobs.length} positions from database`, 'success');
-                // Mark connection as healthy after successful database load
-                ConnectionManager.recordSuccess();
-                updateConnectionIndicator();
-            }
+
+            window.showToast(`Loaded ${processedJobs.length} positions from database`, 'success');
+            // Mark connection as healthy after successful database load
+            ConnectionManager.recordSuccess();
+            updateConnectionIndicator();
             
             // Load stats data for the Stats tab
             try {
@@ -3643,9 +3785,19 @@
       View.kpis([]);
       View.legend();
       View.viewToggle();
-      
-      // Auto-load data from database on page load
-      window.loadDataFromDatabase();
+
+      // Validate database connection before loading data
+      // The validation overlay is visible by default
+      lucide.createIcons(); // Initialize icons in the overlay
+
+      (async () => {
+        const isConnected = await validateDatabaseConnection();
+        if (isConnected) {
+          // Connection validated - now load the full data
+          window.loadDataFromDatabase();
+        }
+        // If not connected, the validation overlay will remain visible with retry button
+      })();
     });
 
     window.View = View;
