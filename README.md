@@ -1,30 +1,47 @@
-# GHR Impact Manager - Updated Version
+# GHR Impact Manager
 
-## Overview
+## Version History
 
-**Key Updates:**
-- Database connection through API endpoint
-- Change tracking system with localStorage
-- Export changes functionality
-- Automatic replay of changes on data load
-  
-```
-┌─────────────────────────────────────────────────────┐
-│  1. User loads app                                   │
-│  2. App fetches base data from database              │
-│  3. App loads changes from server (JSON file)        │
-│  4. Changes are applied on top of base data          │
-│  5. Combined data is displayed to user               │
-│                                                       │
-│  When user makes changes:                            │
-│  6. Change is recorded to changeLog array            │
-│  7. Change is automatically saved to server          │
-│  8. Server writes to ghr-changes table           │
-│  9. UI is updated immediately                        │
-│  10. All users see changes on next refresh           │
-│                                                       │
-│  When user clicks "Export Changes":                  │
-│  11. Current change log downloaded from server       │
-│  12. File saved to user's computer                   │
-└─────────────────────────────────────────────────────┘
-```
+**1.3.3** - Connection validation & cascading filters
+- Require database connection before allowing interaction
+- Cascading dropdown filters (selecting one filter updates others to show relevant options)
+- App version moved to environment variable
+
+**1.3.2** - Next step history & stats filtering
+- Next step history modal to view all previous next steps for a position
+- Stats page now respects category and specialty filters
+
+**1.3.1** - Stats data improvements
+- Updated SQL queries for better stats accuracy
+- Filter active assignments by 'Closed And Awarded' status
+
+**1.3.0** - Connection status & health system matching
+- Connection status indicator in header
+- Connection lost modal blocks interaction until refresh
+- Robust health system matching logic
+
+**1.2.2** - VNDLY Integration
+- Added VNDLY data source for positions and submissions
+- Bill rate and facility fallback handling
+
+**1.2.1** - Stats & KPI filtering
+- Stats and KPI cards now obey filter selections
+- Privacy/redaction mode on by default
+
+**1.2.0** - Mobile & filter improvements
+- Mobile view improvements
+- Filter dropdown UI updates
+- Multiple filter bug fixes
+
+**1.1.0** - Fill rate & submissions
+- Fill rate tracking and display
+- Submission interview scheduling and removal
+- History modal improvements
+
+**1.0.0** - Initial release
+- Database-driven position management
+- Change tracking system
+- Lever/action tracking
+- Export functionality
+
+---
