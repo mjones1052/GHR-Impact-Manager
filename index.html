@@ -376,6 +376,10 @@
         <button onclick="store.dispatch('SET_VIEW','stats')" id="btnViewStats"
                 class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors text-slate-500 hover:text-slate-700">Stats</button>
       </div>
+      <button onclick="exportTravelAgingReport()" id="btnTravelAgingReport"
+              class="px-4 py-1.5 text-xs font-bold rounded-lg transition-colors bg-purple-600 hover:bg-purple-700 text-white shadow-sm flex items-center gap-1.5">
+        <i data-lucide="plane" class="w-3 h-3"></i> Travel Aging Report
+      </button>
     </div>
   </div>
 
@@ -1826,6 +1830,82 @@
           const newName = cleanName.startsWith('Updated_') ? cleanName : `Updated_${cleanName}`;
           XLSX.writeFile(wb, `${newName}.xlsx`);
           window.showToast("Export successful!", "success");
+        } catch (e) {
+          console.error(e);
+          window.showToast("Export failed. Check console.", "error");
+        } finally {
+          Utils.setLoading(false);
+        }
+      }, 50);
+    };
+
+    window.exportTravelAgingReport = () => {
+      const s = window.store.state;
+      if (s.jobs.length === 0) {
+        window.showToast("No data to export", 'error');
+        return;
+      }
+
+      Utils.setLoading(true, "Exporting Travel Aging Report...");
+      setTimeout(() => {
+        try {
+          // Filter jobs based on criteria:
+          // 1. Days >= 16
+          // 2. Category = Travel Nursing (check program field)
+          // 3. Lever Pulled <= 1
+          const filteredJobs = s.jobs.filter(job => {
+            // Check days >= 16
+            if (!job.daysPast || job.daysPast < 16) return false;
+
+            // Check if category is Travel Nursing
+            const program = String(job.program || '').toLowerCase();
+            const isTravelNursing = program.includes('travel') && CONSTANTS.NURSING_KEYWORDS.some(k => program.includes(k));
+            if (!isTravelNursing) return false;
+
+            // Count levers that are done
+            const leversDone = Object.values(job.levers || {}).filter(lever => lever && lever.done).length;
+            if (leversDone > 1) return false;
+
+            return true;
+          });
+
+          if (filteredJobs.length === 0) {
+            window.showToast("No jobs match the Travel Aging Report criteria", 'warning');
+            Utils.setLoading(false);
+            return;
+          }
+
+          // Create export rows
+          const exportRows = filteredJobs.map(job => {
+            const row = { ...(job._raw || {}) };
+            row['Days Past'] = job.daysPast;
+            row['Current Margin'] = job.margin ? job.margin + '%' : '';
+            row['Next Steps'] = job.nextStep ? `[${job.nextStep.date || ''}] ${job.nextStep.text || ''}` : '';
+            row['AV Open Date'] = job.avOpenDate || '';
+            row['Shift Time'] = job.shiftTime || '';
+            row['Bill Rate'] = job.billRate;
+            row['Levers Pulled Count'] = Object.values(job.levers || {}).filter(lever => lever && lever.done).length;
+
+            if (job.levers) {
+              Object.entries(job.levers || {}).forEach(([key, val]) => {
+                row[`Lever: ${CONSTANTS.LEVER_LABELS[key]}`] = (val && val.done) ? `${val.user || ''} (${val.time || ''})` : '';
+              });
+            }
+
+            const interviews = (job.candidates || []).filter(c => c.interviewDate).map(c => `${c.name} (${c.interviewDate})`).join('; ');
+            if (interviews) row['Scheduled Interviews'] = interviews;
+
+            return row;
+          });
+
+          const ws = XLSX.utils.json_to_sheet(exportRows);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Travel_Aging_Report");
+
+          const timestamp = new Date().toISOString().split('T')[0];
+          XLSX.writeFile(wb, `Travel_Aging_Report_${timestamp}.xlsx`);
+
+          window.showToast(`Exported ${filteredJobs.length} jobs to Travel Aging Report`, "success");
         } catch (e) {
           console.error(e);
           window.showToast("Export failed. Check console.", "error");
